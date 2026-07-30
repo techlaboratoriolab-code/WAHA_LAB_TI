@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Web - WAHA Atendimento</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Phosphor Icons para ícones estilo WhatsApp -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- BARRA LATERAL (LISTA DE CHATS) -->
+    <aside class="sidebar">
+      
+      <!-- HEADER DA BARRA LATERAL -->
+      <header class="sidebar-header">
+        <div class="user-profile">
+          <div class="avatar avatar-session">
+            <i class="ph-bold ph-whatsapp-logo"></i>
+          </div>
+          <div class="session-info">
+            <h3 id="session-name">atendimento</h3>
+            <span class="status-badge" id="session-status">
+              <span class="status-dot"></span>
+              <span id="session-status-text">Conectando...</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="icon-btn" id="restart-session-btn" title="Reiniciar Conexão / Sessão">
+            <i class="ph-bold ph-power"></i>
+          </button>
+          <button class="icon-btn" id="new-chat-btn" title="Nova conversa por número">
+            <i class="ph-bold ph-chat-plus"></i>
+          </button>
+          <button class="icon-btn" id="refresh-chats-btn" title="Atualizar conversas">
+            <i class="ph-bold ph-arrows-clockwise"></i>
+          </button>
+          <button class="icon-btn" id="toggle-theme-btn" title="Alternar Tema Claro/Escuro">
+            <i class="ph-bold ph-moon"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- BARRA DE PESQUISA DOS CHATS -->
+      <div class="search-container">
+        <div class="search-input-wrapper">
+          <i class="ph-bold ph-magnifying-glass search-icon"></i>
+          <input type="text" id="search-input" placeholder="Pesquisar por nome ou número..." autocomplete="off">
+          <button class="clear-search-btn hidden" id="clear-search-btn">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- ESTATÍSTICA/CONTADOR DE CHATS -->
+      <div class="chats-counter-bar">
+        <span id="chats-count-text">Carregando conversas...</span>
+        <span class="filter-tag" id="active-filter-tag" style="display:none;">Filtrado</span>
+      </div>
+
+      <!-- LISTA DE CHATS -->
+      <div class="chats-list" id="chats-list">
+        <!-- Skeleton Loaders iniciais -->
+        <div class="chat-item-skeleton"></div>
+        <div class="chat-item-skeleton"></div>
+        <div class="chat-item-skeleton"></div>
+        <div class="chat-item-skeleton"></div>
+        <div class="chat-item-skeleton"></div>
+      </div>
+      
+    </aside>
+
+    <!-- ÁREA PRINCIPAL DA CONVERSA -->
+    <main class="chat-view" id="chat-view">
+      
+      <!-- ESTADO VAZIO (NENHUM CHAT SELECIONADO) -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-content">
+          <div class="whatsapp-illustration">
+            <i class="ph-duotone ph-whatsapp-logo"></i>
+          </div>
+          <h2>WhatsApp Web WAHA</h2>
+          <p>Envie e receba mensagens diretamente da sessão <strong>atendimento</strong>.</p>
+          <div class="empty-features">
+            <div class="feature-tag"><i class="ph-bold ph-shield-check"></i> Conexão Ativa</div>
+            <div class="feature-tag"><i class="ph-bold ph-file-pdf"></i> Envio de PDFs e Arquivos</div>
+            <div class="feature-tag"><i class="ph-bold ph-user"></i> Exibição Inteligente de Nomes</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA DO CHAT ATIVO (ESCONDIDA POR PADRÃO) -->
+      <div class="active-chat-container hidden" id="active-chat-container">
+        
+        <!-- HEADER DO CHAT ATIVO -->
+        <header class="chat-header">
+          <div class="chat-header-info" id="chat-header-info">
+            <div class="avatar" id="active-avatar">C</div>
+            <div class="chat-details">
+              <h2 id="active-chat-name">Nome do Contato</h2>
+              <p id="active-chat-id">55619XXXXXX@c.us</p>
+            </div>
+          </div>
+
+          <div class="chat-header-actions">
+            <button class="icon-btn" id="refresh-messages-btn" title="Atualizar mensagens">
+              <i class="ph-bold ph-arrows-clockwise"></i>
+            </button>
+            <button class="icon-btn" id="copy-number-btn" title="Copiar número do WhatsApp">
+              <i class="ph-bold ph-copy"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- ÁREA DE MENSAGENS -->
+        <div class="messages-container" id="messages-container">
+          <!-- As mensagens serão renderizadas via JavaScript -->
+        </div>
+
+        <!-- PAINEL DE ANEXOS / PREVISÃO DE ARQUIVO -->
+        <div class="file-preview-panel hidden" id="file-preview-panel">
+          <div class="file-preview-info">
+            <i class="ph-bold ph-file-pdf pdf-icon"></i>
+            <div class="file-meta">
+              <span id="preview-filename">documento.pdf</span>
+              <span id="preview-filesize">0 KB</span>
+            </div>
+          </div>
+          <button class="icon-btn remove-file-btn" id="remove-file-btn" title="Remover arquivo">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+
+        <!-- MODELO DE MODELO RÁPIDO / TEMPLATES -->
+        <div class="quick-replies-bar hidden" id="quick-replies-bar">
+          <span class="quick-title">Modelos rápidos:</span>
+          <button class="quick-chip" data-msg="Olá! Como posso ajudar você hoje?">👋 Olá!</button>
+          <button class="quick-chip" data-msg="Segue o comprovante em anexo.">📄 Comprovante</button>
+          <button class="quick-chip" data-msg="Seu documento foi recebido com sucesso.">✅ Confirmado</button>
+          <button class="quick-chip" data-msg="Por favor, confirme o recebimento.">📩 Confirmar recebimento</button>
+        </div>
+
+        <!-- CAIXA DE ENTRADA E ENVIO DE MENSAGEM -->
+        <footer class="chat-input-area">
+          <div class="input-actions-left">
+            <button class="icon-btn" id="attach-btn" title="Anexar arquivo / PDF">
+              <i class="ph-bold ph-paperclip"></i>
+            </button>
+            <input type="file" id="file-input" class="hidden" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip">
+            
+            <button class="icon-btn" id="toggle-templates-btn" title="Mensagens Rápidas">
+              <i class="ph-bold ph-lightning"></i>
+            </button>
+          </div>
+
+          <div class="message-input-wrapper">
+            <textarea id="message-text-input" placeholder="Digite uma mensagem" rows="1"></textarea>
+          </div>
+
+          <button class="send-btn" id="send-msg-btn" title="Enviar Mensagem">
+            <i class="ph-bold ph-paper-plane-right"></i>
+          </button>
+        </footer>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- MODAL: NOVA CONVERSA POR NÚMERO -->
+  <div class="modal-backdrop hidden" id="new-chat-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Iniciar Nova Conversa</h3>
+        <button class="icon-btn" id="close-modal-btn"><i class="ph-bold ph-x"></i></button>
+      </div>
+      <div class="modal-body">
+        <label for="new-number-input">Número do WhatsApp (com DDD e Código do País):</label>
+        <input type="text" id="new-number-input" placeholder="Ex: 5561999999999 ou 5561988888888" autocomplete="off">
+        <p class="modal-help">Dica: Insira no formato internacional. Ex: 55 (Brasil) + 61 (DDD) + Número.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-modal-btn">Cancelar</button>
+        <button class="btn btn-primary" id="start-chat-btn">Abrir Conversa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICAÇÃO TOAST -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
