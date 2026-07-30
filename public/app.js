@@ -209,18 +209,74 @@ document.addEventListener('DOMContentLoaded', () => {
     renderChatsList(searchInput.value.trim() !== '' ? filterChatsLocally(searchInput.value.trim()) : chats);
 
     if (activeChat && activeChat.id === chatId) {
-      loadMessages(chatId);
+      loadMessages(chatId, true);
       markChatAsSeen(chatId);
+    }
+  }
+
+  let isPollingActive = false;
+
+  async function syncRecentChatsSilently() {
+    try {
+      const res = await fetch('/api/chats?limit=25&offset=0');
+      if (!res.ok) return;
+
+      const recentChats = await res.json();
+      if (!Array.isArray(recentChats)) return;
+
+      let changed = false;
+
+      recentChats.forEach(incoming => {
+        let existing = chats.find(c => c.id === incoming.id);
+        if (!existing) {
+          chats.push(incoming);
+          changed = true;
+        } else {
+          if (incoming.lastActivity && incoming.lastActivity !== existing.lastActivity) {
+            existing.lastActivity = incoming.lastActivity;
+            changed = true;
+          }
+          if (incoming.lastMessagePreview && incoming.lastMessagePreview !== existing.lastMessagePreview) {
+            existing.lastMessagePreview = incoming.lastMessagePreview;
+            changed = true;
+          }
+          if (typeof incoming.unreadCount === 'number' && incoming.unreadCount !== existing.unreadCount) {
+            if (activeChat && activeChat.id === incoming.id) {
+              existing.unreadCount = 0;
+            } else {
+              existing.unreadCount = incoming.unreadCount;
+              changed = true;
+            }
+          }
+        }
+      });
+
+      if (changed) {
+        chats.sort((a, b) => (Number(b.lastActivity || b.conversationTimestamp) || 0) - (Number(a.lastActivity || a.conversationTimestamp) || 0));
+        const query = searchInput.value.trim();
+        renderChatsList(query ? filterChatsLocally(query) : chats);
+      }
+    } catch (err) {
+      console.warn('Erro ao sincronizar chats silenciosamente:', err);
     }
   }
 
   function startSmartPollingSync() {
     setInterval(async () => {
-      checkSessionStatus();
-      if (activeChat) {
-        loadMessages(activeChat.id, true);
+      if (isPollingActive) return;
+      isPollingActive = true;
+      try {
+        await checkSessionStatus();
+        await syncRecentChatsSilently();
+        if (activeChat) {
+          await loadMessages(activeChat.id, true);
+        }
+      } catch (e) {
+        console.warn('Erro no ciclo de polling:', e);
+      } finally {
+        isPollingActive = false;
       }
-    }, 5000);
+    }, 4000);
   }
 
   // ---------------------------------------------------------------------------
