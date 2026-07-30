@@ -3,32 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WhatsApp Web - WAHA Atendimento</title>
+  <title>Lab Atendimento · WAHA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Phosphor Icons para ícones estilo WhatsApp -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Phosphor Icons para ícones de apoio -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="colors_and_type.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app-container">
     
+    <!-- WORKSPACE RAIL (BARRA DE NAVEGAÇÃO ESQUERDA) -->
+    <nav class="workspace-rail">
+      <div class="rail-top">
+        <div class="workspace-logo" title="Lab Atendimento Workspace">
+          <span class="logo-mark-dot"></span>
+          <i class="ph-bold ph-chats-teardrop"></i>
+        </div>
+        <div class="rail-divider"></div>
+        <button class="rail-btn active" title="Conversas / Mensagens">
+          <i class="ph-bold ph-chat-teardrop-text"></i>
+        </button>
+        <button class="rail-btn" id="new-chat-rail-trigger" onclick="document.getElementById('new-chat-btn').click()" title="Nova Conversa">
+          <i class="ph-bold ph-plus-circle"></i>
+        </button>
+      </div>
+      <div class="rail-bottom">
+        <button class="rail-btn" id="rail-toggle-theme" onclick="document.getElementById('toggle-theme-btn').click()" title="Alternar Tema">
+          <i class="ph-bold ph-moon-stars"></i>
+        </button>
+      </div>
+    </nav>
+
     <!-- BARRA LATERAL (LISTA DE CHATS) -->
     <aside class="sidebar">
       
       <!-- HEADER DA BARRA LATERAL -->
       <header class="sidebar-header">
         <div class="user-profile">
-          <div class="avatar avatar-session">
-            <i class="ph-bold ph-whatsapp-logo"></i>
-          </div>
           <div class="session-info">
-            <h3 id="session-name">atendimento</h3>
-            <span class="status-badge" id="session-status">
-              <span class="status-dot"></span>
-              <span id="session-status-text">Conectando...</span>
-            </span>
+            <div class="workspace-title-row">
+              <h3 id="session-name" class="text-gradient-brand">Lab Atendimento</h3>
+              <span class="status-badge" id="session-status" title="Status da Conexão">
+                <span class="status-dot"></span>
+                <span id="session-status-text" class="hidden" style="display: none !important;"></span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -37,7 +61,7 @@
             <i class="ph-bold ph-power"></i>
           </button>
           <button class="icon-btn" id="new-chat-btn" title="Nova conversa por número">
-            <i class="ph-bold ph-chat-plus"></i>
+            <i class="ph-bold ph-plus"></i>
           </button>
           <button class="icon-btn" id="refresh-chats-btn" title="Atualizar conversas">
             <i class="ph-bold ph-arrows-clockwise"></i>
@@ -52,7 +76,7 @@
       <div class="search-container">
         <div class="search-input-wrapper">
           <i class="ph-bold ph-magnifying-glass search-icon"></i>
-          <input type="text" id="search-input" placeholder="Pesquisar por nome ou número..." autocomplete="off">
+          <input type="text" id="search-input" placeholder="Buscar conversas ou números..." autocomplete="off">
           <button class="clear-search-btn hidden" id="clear-search-btn">
             <i class="ph-bold ph-x"></i>
           </button>
@@ -80,18 +104,20 @@
     <!-- ÁREA PRINCIPAL DA CONVERSA -->
     <main class="chat-view" id="chat-view">
       
-      <!-- ESTADO VAZIO (NENHUM CHAT SELECIONADO) -->
+      <!-- ESTADO VAZIO -->
       <div class="empty-state" id="empty-state">
         <div class="empty-content">
-          <div class="whatsapp-illustration">
-            <i class="ph-duotone ph-whatsapp-logo"></i>
+          <div class="brand-illustration">
+            <div class="glow-ring"></div>
+            <div class="brand-logo-hero">
+              <span class="hero-lab-title">LAB<span class="hero-dot">.</span></span>
+            </div>
           </div>
-          <h2>WhatsApp Web WAHA</h2>
-          <p>Envie e receba mensagens diretamente da sessão <strong>atendimento</strong>.</p>
+          <h2 class="text-gradient-brand">Lab Atendimento</h2>
+          <p>Selecione um contato ou mensagem para iniciar o atendimento operacional em tempo real.</p>
           <div class="empty-features">
-            <div class="feature-tag"><i class="ph-bold ph-shield-check"></i> Conexão Ativa</div>
-            <div class="feature-tag"><i class="ph-bold ph-file-pdf"></i> Envio de PDFs e Arquivos</div>
-            <div class="feature-tag"><i class="ph-bold ph-user"></i> Exibição Inteligente de Nomes</div>
+            <div class="feature-tag"><i class="ph-bold ph-check-circle"></i> Sincronização Inteligente</div>
+            <div class="feature-tag"><i class="ph-bold ph-paperclip"></i> Suporte a Mídia & PDFs</div>
           </div>
         </div>
       </div>
@@ -104,7 +130,10 @@
           <div class="chat-header-info" id="chat-header-info">
             <div class="avatar" id="active-avatar">C</div>
             <div class="chat-details">
-              <h2 id="active-chat-name">Nome do Contato</h2>
+              <div class="chat-title-row">
+                <i class="ph-bold ph-chat-teardrop-text channel-hash-icon"></i>
+                <h2 id="active-chat-name">Nome do Contato</h2>
+              </div>
               <p id="active-chat-id">55619XXXXXX@c.us</p>
             </div>
           </div>
@@ -127,7 +156,9 @@
         <!-- PAINEL DE ANEXOS / PREVISÃO DE ARQUIVO -->
         <div class="file-preview-panel hidden" id="file-preview-panel">
           <div class="file-preview-info">
-            <i class="ph-bold ph-file-pdf pdf-icon"></i>
+            <div class="file-icon-badge">
+              <i class="ph-bold ph-file-text pdf-icon"></i>
+            </div>
             <div class="file-meta">
               <span id="preview-filename">documento.pdf</span>
               <span id="preview-filesize">0 KB</span>
@@ -138,35 +169,26 @@
           </button>
         </div>
 
-        <!-- MODELO DE MODELO RÁPIDO / TEMPLATES -->
-        <div class="quick-replies-bar hidden" id="quick-replies-bar">
-          <span class="quick-title">Modelos rápidos:</span>
-          <button class="quick-chip" data-msg="Olá! Como posso ajudar você hoje?">👋 Olá!</button>
-          <button class="quick-chip" data-msg="Segue o comprovante em anexo.">📄 Comprovante</button>
-          <button class="quick-chip" data-msg="Seu documento foi recebido com sucesso.">✅ Confirmado</button>
-          <button class="quick-chip" data-msg="Por favor, confirme o recebimento.">📩 Confirmar recebimento</button>
-        </div>
-
         <!-- CAIXA DE ENTRADA E ENVIO DE MENSAGEM -->
         <footer class="chat-input-area">
-          <div class="input-actions-left">
-            <button class="icon-btn" id="attach-btn" title="Anexar arquivo / PDF">
-              <i class="ph-bold ph-paperclip"></i>
-            </button>
-            <input type="file" id="file-input" class="hidden" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip">
-            
-            <button class="icon-btn" id="toggle-templates-btn" title="Mensagens Rápidas">
-              <i class="ph-bold ph-lightning"></i>
-            </button>
-          </div>
+          <div class="input-box-container">
+            <div class="message-input-wrapper">
+              <textarea id="message-text-input" placeholder="Enviar mensagem..." rows="1"></textarea>
+            </div>
+            <div class="input-toolbar">
+              <div class="input-actions-left">
+                <button class="attach-btn-styled" id="attach-btn" title="Anexar arquivo / PDF">
+                  <i class="ph-bold ph-paperclip"></i>
+                  <span>Anexar Arquivo</span>
+                </button>
+                <input type="file" id="file-input" class="hidden" style="display: none !important; opacity: 0; position: absolute; pointer-events: none;" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip">
+              </div>
 
-          <div class="message-input-wrapper">
-            <textarea id="message-text-input" placeholder="Digite uma mensagem" rows="1"></textarea>
+              <button class="send-btn" id="send-msg-btn" title="Enviar Mensagem">
+                <i class="ph-bold ph-paper-plane-right"></i>
+              </button>
+            </div>
           </div>
-
-          <button class="send-btn" id="send-msg-btn" title="Enviar Mensagem">
-            <i class="ph-bold ph-paper-plane-right"></i>
-          </button>
         </footer>
 
       </div>
@@ -179,17 +201,43 @@
   <div class="modal-backdrop hidden" id="new-chat-modal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Iniciar Nova Conversa</h3>
+        <h3><i class="ph-bold ph-chat-circle-plus"></i> Nova Conversa</h3>
         <button class="icon-btn" id="close-modal-btn"><i class="ph-bold ph-x"></i></button>
       </div>
       <div class="modal-body">
-        <label for="new-number-input">Número do WhatsApp (com DDD e Código do País):</label>
-        <input type="text" id="new-number-input" placeholder="Ex: 5561999999999 ou 5561988888888" autocomplete="off">
-        <p class="modal-help">Dica: Insira no formato internacional. Ex: 55 (Brasil) + 61 (DDD) + Número.</p>
+        <label for="new-number-input">Número do WhatsApp (com DDD e DDI):</label>
+        <div class="modal-input-wrapper">
+          <i class="ph-bold ph-phone"></i>
+          <input type="text" id="new-number-input" placeholder="Ex: 5561999999999" autocomplete="off">
+        </div>
+        <p class="modal-help">Insira o número completo com código do país (ex: 55 para Brasil) + DDD + Número.</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" id="cancel-modal-btn">Cancelar</button>
         <button class="btn btn-primary" id="start-chat-btn">Abrir Conversa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VISUALIZADOR INTERNO DE ARQUIVOS (PREVIEW MODAL) -->
+  <div class="modal-backdrop hidden" id="file-viewer-modal">
+    <div class="modal-card modal-viewer-card">
+      <div class="modal-header">
+        <div class="viewer-title-box">
+          <i class="ph-bold ph-eye" id="viewer-icon"></i>
+          <span id="viewer-filename">Visualizar Arquivo</span>
+        </div>
+        <div class="viewer-header-actions">
+          <a id="viewer-download-btn" href="#" download class="btn btn-secondary viewer-dl-btn" title="Baixar Arquivo">
+            <i class="ph-bold ph-download-simple"></i> Baixar
+          </a>
+          <button class="icon-btn" id="close-viewer-btn" title="Fechar (ESC)">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body viewer-body" id="viewer-content-body">
+        <!-- Conteúdo do preview inserido dinamicamente pelo JS -->
       </div>
     </div>
   </div>
@@ -200,3 +248,5 @@
   <script src="app.js"></script>
 </body>
 </html>
+
+

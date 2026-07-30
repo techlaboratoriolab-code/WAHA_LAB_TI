@@ -10,11 +10,11 @@ const PORT = process.env.PORT || 3000;
 
 // Configuração do WAHA
 const WAHA_CONFIG = {
-  url: process.env.WAHA_URL || 'https://waha.ngrok.dev',
-  session: process.env.WAHA_SESSION || 'atendimento',
-  apiKey: process.env.WAHA_API_KEY || 'laboratorio-lab',
-  user: process.env.WAHA_USER || 'LAB',
-  password: process.env.WAHA_PASSWORD || 'lab0042'
+  url: process.env.WAHA_URL || '',
+  session: process.env.WAHA_SESSION || '',
+  apiKey: process.env.WAHA_API_KEY || '',
+  user: process.env.WAHA_USER || '',
+  password: process.env.WAHA_PASSWORD || ''
 };
 
 // Autenticação Basic Auth Base64

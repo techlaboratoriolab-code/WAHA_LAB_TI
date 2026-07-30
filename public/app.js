@@ -46,9 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewFilesizeEl = document.getElementById('preview-filesize');
   const removeFileBtn = document.getElementById('remove-file-btn');
 
-  const toggleTemplatesBtn = document.getElementById('toggle-templates-btn');
-  const quickRepliesBar = document.getElementById('quick-replies-bar');
-
   const newChatBtn = document.getElementById('new-chat-btn');
   const restartSessionBtn = document.getElementById('restart-session-btn');
   const newChatModal = document.getElementById('new-chat-modal');
@@ -73,6 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupRealtimeEvents();
     startSmartPollingSync();
+    refreshLucideIcons();
+  }
+
+  function refreshLucideIcons() {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      try { window.lucide.createIcons(); } catch(e) {}
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -872,7 +876,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (mimetype.startsWith('image/')) {
         if (mediaUrl) {
-          bodyHtml += `<img src="${escapeHtml(mediaUrl)}" class="msg-img-preview" onclick="window.open('${escapeHtml(mediaUrl)}', '_blank')" title="Clique para abrir imagem" alt="Foto" />`;
+          const imgName = filename || 'Foto.jpg';
+          bodyHtml += `<img src="${escapeHtml(mediaUrl)}" class="msg-img-preview" onclick="window.openFileViewer('${escapeHtml(mediaUrl)}', '${escapeHtml(imgName)}', '${escapeHtml(mimetype)}')" title="Clique para visualizar imagem" alt="Foto" />`;
         }
       } else if (mimetype.startsWith('audio/') || msg.type === 'ptt' || msg.type === 'audio') {
         if (mediaUrl) {
@@ -890,7 +895,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="msg-file-details">
               <span class="msg-file-name">${escapeHtml(docName)}</span>
               <span class="msg-file-sub">Arquivo / Documento PDF</span>
-              ${mediaUrl ? `<a href="${escapeHtml(mediaUrl)}" target="_blank" download="${escapeHtml(docName)}" class="msg-file-btn"><i class="ph-bold ph-download-simple"></i> Visualizar / Baixar PDF</a>` : ''}
+              ${mediaUrl ? `<button type="button" onclick="window.openFileViewer('${escapeHtml(mediaUrl)}', '${escapeHtml(docName)}', '${escapeHtml(mimetype)}')" class="msg-file-btn"><i class="ph-bold ph-eye"></i> Visualizar Arquivo</button>` : ''}
             </div>
           </div>
         `;
@@ -1046,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
       handleSearch();
     });
 
-    // Auto-expandir textarea
+    // Auto-expandir textarea e Enter para enviar
     messageTextInput.addEventListener('input', autoResizeTextarea);
     messageTextInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -1054,6 +1059,36 @@ document.addEventListener('DOMContentLoaded', () => {
         sendMessage();
       }
     });
+
+    // Tecla ESC para fechar modal de visualização, modal de nova conversa ou sair da conversa ativa
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        const viewerModal = document.getElementById('file-viewer-modal');
+        if (viewerModal && !viewerModal.classList.contains('hidden')) {
+          window.closeFileViewer();
+          return;
+        }
+
+        if (newChatModal && !newChatModal.classList.contains('hidden')) {
+          newChatModal.classList.add('hidden');
+          return;
+        }
+
+        if (activeChat) {
+          deselectActiveChat();
+        }
+      }
+    });
+
+    // Eventos do Modal Visualizador de Arquivo
+    const closeViewerBtn = document.getElementById('close-viewer-btn');
+    const fileViewerModal = document.getElementById('file-viewer-modal');
+    if (closeViewerBtn) closeViewerBtn.addEventListener('click', window.closeFileViewer);
+    if (fileViewerModal) {
+      fileViewerModal.addEventListener('click', (e) => {
+        if (e.target === fileViewerModal) window.closeFileViewer();
+      });
+    }
 
     sendMsgBtn.addEventListener('click', sendMessage);
 
@@ -1076,20 +1111,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     removeFileBtn.addEventListener('click', clearFileSelection);
-
-    // Painel de Modelos Rápidos
-    toggleTemplatesBtn.addEventListener('click', () => {
-      quickRepliesBar.classList.toggle('hidden');
-    });
-
-    document.querySelectorAll('.quick-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const msg = chip.dataset.msg;
-        messageTextInput.value = msg;
-        messageTextInput.focus();
-        autoResizeTextarea();
-      });
-    });
 
     // Modal Nova Conversa
     newChatBtn.addEventListener('click', () => {
@@ -1146,12 +1167,81 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
+  // VISUALIZADOR DE ARQUIVOS (IN-SITE PREVIEW MODAL)
+  // ---------------------------------------------------------------------------
+  window.openFileViewer = function(mediaUrl, filename, mimetype) {
+    if (!mediaUrl) return;
+
+    const modal = document.getElementById('file-viewer-modal');
+    const filenameEl = document.getElementById('viewer-filename');
+    const downloadBtn = document.getElementById('viewer-download-btn');
+    const bodyEl = document.getElementById('viewer-content-body');
+    const iconEl = document.getElementById('viewer-icon');
+
+    if (!modal || !bodyEl) return;
+
+    const safeName = filename || 'Arquivo';
+    if (filenameEl) filenameEl.textContent = safeName;
+    if (downloadBtn) {
+      downloadBtn.href = mediaUrl;
+      downloadBtn.setAttribute('download', safeName);
+    }
+
+    bodyEl.innerHTML = '';
+    const mime = (mimetype || '').toLowerCase();
+    const nameLower = safeName.toLowerCase();
+
+    if (mime.startsWith('image/') || nameLower.endsWith('.jpg') || nameLower.endsWith('.png') || nameLower.endsWith('.jpeg') || nameLower.endsWith('.webp') || nameLower.endsWith('.gif')) {
+      if (iconEl) iconEl.className = 'ph-bold ph-image';
+      bodyEl.innerHTML = `<img src="${escapeHtml(mediaUrl)}" class="viewer-media-img" alt="${escapeHtml(safeName)}" />`;
+    } else if (mime.includes('pdf') || nameLower.endsWith('.pdf')) {
+      if (iconEl) iconEl.className = 'ph-bold ph-file-pdf';
+      bodyEl.innerHTML = `<iframe src="${escapeHtml(mediaUrl)}" class="viewer-pdf-iframe" title="${escapeHtml(safeName)}"></iframe>`;
+    } else if (mime.startsWith('video/') || nameLower.endsWith('.mp4') || nameLower.endsWith('.webm')) {
+      if (iconEl) iconEl.className = 'ph-bold ph-video-camera';
+      bodyEl.innerHTML = `<video src="${escapeHtml(mediaUrl)}" controls autoplay class="viewer-media-video"></video>`;
+    } else if (mime.startsWith('audio/') || nameLower.endsWith('.mp3') || nameLower.endsWith('.ogg') || nameLower.endsWith('.wav')) {
+      if (iconEl) iconEl.className = 'ph-bold ph-music-notes';
+      bodyEl.innerHTML = `<audio src="${escapeHtml(mediaUrl)}" controls autoplay class="viewer-media-audio"></audio>`;
+    } else {
+      if (iconEl) iconEl.className = 'ph-bold ph-file-text';
+      bodyEl.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--text-main);">
+          <i class="ph-bold ph-file-text" style="font-size: 3.5rem; color: var(--blue-500); margin-bottom: 16px;"></i>
+          <h4 style="font-size: 1.1rem; margin-bottom: 8px;">${escapeHtml(safeName)}</h4>
+          <p style="font-size: 0.85rem; color: var(--text-sub); margin-bottom: 24px;">Pré-visualização direta não disponível para este formato.</p>
+          <a href="${escapeHtml(mediaUrl)}" download="${escapeHtml(safeName)}" class="btn btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="ph-bold ph-download-simple"></i> Baixar Arquivo
+          </a>
+        </div>
+      `;
+    }
+
+    modal.classList.remove('hidden');
+  };
+
+  window.closeFileViewer = function() {
+    const modal = document.getElementById('file-viewer-modal');
+    const bodyEl = document.getElementById('viewer-content-body');
+    if (modal) modal.classList.add('hidden');
+    if (bodyEl) bodyEl.innerHTML = '';
+  };
+
+  // ---------------------------------------------------------------------------
   // HELPERS E UTILITÁRIOS
   // ---------------------------------------------------------------------------
   function clearFileSelection() {
     selectedFile = null;
     fileInput.value = '';
     filePreviewPanel.classList.add('hidden');
+  }
+
+  function deselectActiveChat() {
+    activeChat = null;
+    if (activeChatContainerEl) activeChatContainerEl.classList.add('hidden');
+    if (emptyStateEl) emptyStateEl.classList.remove('hidden');
+    document.querySelectorAll('.chat-item.active').forEach(el => el.classList.remove('active'));
+    clearFileSelection();
   }
 
   function autoResizeTextarea() {
