@@ -535,7 +535,8 @@ document.addEventListener('DOMContentLoaded', () => {
           loadMessages(activeChat.id);
           showToast('Arquivo enviado com sucesso!');
         } else {
-          showToast(`Erro ao enviar arquivo: ${data.error?.message || 'Falha na requisição'}`, 'error');
+          const errMsg = data.error?.exception?.message || data.error?.message || data.error?.error || 'Falha na requisição';
+          showToast(`Erro ao enviar arquivo: ${errMsg}`, 'error');
         }
       } else {
         const res = await fetch('/api/send-text', {
@@ -558,7 +559,8 @@ document.addEventListener('DOMContentLoaded', () => {
           autoResizeTextarea();
           loadMessages(activeChat.id);
         } else {
-          showToast(`Erro ao enviar mensagem: ${data.error?.message || 'Falha no envio'}`, 'error');
+          const errMsg = data.error?.exception?.message || data.error?.message || data.error?.error || 'Falha no envio';
+          showToast(`Erro ao enviar mensagem: ${errMsg}`, 'error');
         }
       }
     } catch (err) {
