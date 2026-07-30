@@ -181,3 +181,7 @@ cython_debug/
 .cursorindexingignore
 node_modules/type-is/LICENSE
 node_modules
+
+# Environment variables
+.env
+.env.local
