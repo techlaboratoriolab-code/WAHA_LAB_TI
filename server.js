@@ -82,7 +82,7 @@ app.get('/api/events', (req, res) => {
 function broadcastEvent(eventType, data) {
   const payload = `data: ${JSON.stringify({ event: eventType, data })}\n\n`;
   sseClients.forEach(client => {
-    try { client.write(payload); } catch(e) {}
+    try { client.write(payload); } catch (e) { }
   });
 }
 
@@ -155,12 +155,12 @@ app.get('/api/chats', async (req, res) => {
     const sortBy = req.query.sortBy || 'conversationTimestamp';
     const sortOrder = req.query.sortOrder || 'desc';
     const url = `${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats?limit=${limit}&offset=${offset}&sortBy=${sortBy}&sortOrder=${sortOrder}`;
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: getWahaHeaders()
     });
-    
+
     if (!response.ok) {
       const errText = await response.text();
       return res.status(response.status).json({ error: errText });
@@ -205,7 +205,7 @@ app.get('/api/chats/:chatId/messages', async (req, res) => {
     const { chatId } = req.params;
     const limit = req.query.limit || 50;
     const encodedChatId = encodeURIComponent(chatId);
-    
+
     let url = `${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats/${encodedChatId}/messages?limit=${limit}`;
     let response = await fetch(url, {
       method: 'GET',
@@ -255,7 +255,7 @@ app.post('/api/send-text', async (req, res) => {
 
     const resultText = await response.text();
     let resultJson;
-    try { resultJson = JSON.parse(resultText); } catch(e) { resultJson = { raw: resultText }; }
+    try { resultJson = JSON.parse(resultText); } catch (e) { resultJson = { raw: resultText }; }
 
     if (response.ok) {
       broadcastEvent('message', {
@@ -309,7 +309,7 @@ app.post('/api/send-file', upload.single('file'), async (req, res) => {
 
     const resultText = await response.text();
     let resultJson;
-    try { resultJson = JSON.parse(resultText); } catch(e) { resultJson = { raw: resultText }; }
+    try { resultJson = JSON.parse(resultText); } catch (e) { resultJson = { raw: resultText }; }
 
     if (response.ok) {
       const filePreview = mimetype.includes('pdf') ? `📄 ${filename}` : `📎 ${filename}`;
@@ -351,7 +351,7 @@ app.post('/api/send-seen', async (req, res) => {
 
     const resultText = await response.text();
     let resultJson;
-    try { resultJson = JSON.parse(resultText); } catch(e) { resultJson = { raw: resultText }; }
+    try { resultJson = JSON.parse(resultText); } catch (e) { resultJson = { raw: resultText }; }
 
     res.json({ success: response.ok, data: resultJson });
   } catch (err) {
@@ -365,7 +365,7 @@ app.get('/api/files/*', async (req, res) => {
   try {
     const fileRelPath = req.params[0];
     const wahaMediaUrl = `${WAHA_CONFIG.url}/api/files/${fileRelPath}`;
-    
+
     const mediaRes = await fetch(wahaMediaUrl, {
       headers: getWahaHeaders()
     });
