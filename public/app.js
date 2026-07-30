@@ -336,10 +336,16 @@ document.addEventListener('DOMContentLoaded', () => {
     chatsListEl.appendChild(fragment);
   }
 
+  let lastRenderedChatId = null;
+  let lastRenderedSignature = '';
+
   // ---------------------------------------------------------------------------
   // SELEÇÃO E NAVEGAÇÃO DE CHAT
   // ---------------------------------------------------------------------------
   async function selectChat(chat) {
+    lastRenderedChatId = chat.id;
+    lastRenderedSignature = '';
+
     activeChat = chat;
     activeChat.unreadCount = 0;
 
@@ -379,8 +385,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   async function loadMessages(chatId, silent = false) {
     try {
-      if (!silent) {
+      if (!silent || lastRenderedChatId !== chatId) {
         messagesContainerEl.innerHTML = '<div style="padding: 30px; text-align: center; color: var(--text-muted-custom);"><i class="ph-bold ph-spinner spinner" style="font-size: 1.5rem;"></i><p style="margin-top: 8px; font-size: 0.85rem;">Carregando histórico...</p></div>';
+        lastRenderedSignature = '';
+        lastRenderedChatId = chatId;
       }
 
       const res = await fetch(`/api/chats/${encodeURIComponent(chatId)}/messages?limit=50`);
@@ -389,15 +397,30 @@ document.addEventListener('DOMContentLoaded', () => {
       const messages = await res.json();
       
       if (activeChat && activeChat.id === chatId) {
-        const latest = getLatestMessageFromList(messages);
+        const sortedMessages = Array.isArray(messages) ? [...messages].sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0)) : [];
+        
+        const latest = sortedMessages.length > 0 ? sortedMessages[sortedMessages.length - 1] : null;
         if (latest) {
           activeChat.lastMessagePreview = extractPreviewFromMessage(latest);
           activeChat.lastMessageFromMe = latest.fromMe === true;
           activeChat.lastActivity = latest.timestamp || activeChat.lastActivity;
         }
 
-        renderMessages(messages);
-        scrollToBottom();
+        const newSignature = sortedMessages.map(m => `${m.id || ''}_${m.timestamp || ''}_${m.ack || ''}`).join('|');
+
+        // Se as mensagens forem exatamente as mesmas já exibidas, não re-renderiza o DOM (elimina o piscar)
+        if (newSignature === lastRenderedSignature && messagesContainerEl.children.length > 0 && !messagesContainerEl.querySelector('.ph-spinner')) {
+          return;
+        }
+
+        lastRenderedSignature = newSignature;
+        const isNearBottom = messagesContainerEl.scrollHeight - messagesContainerEl.scrollTop - messagesContainerEl.clientHeight < 140;
+
+        renderMessages(sortedMessages);
+        
+        if (!silent || isNearBottom) {
+          scrollToBottom();
+        }
       }
     } catch (err) {
       console.error('Erro ao carregar mensagens:', err);
