@@ -58,22 +58,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleThemeBtn = document.getElementById('toggle-theme-btn');
 
   // ---------------------------------------------------------------------------
-  // INICIALIZAÇÃO
+  // INICIALIZAÇÃO CONTROLADA VIA AUTENTICAÇÃO FLOW LAB
   // ---------------------------------------------------------------------------
-  initApp();
+  let appStarted = false;
 
-  function initApp() {
+  window.startWahaApp = function () {
+    if (appStarted) return;
+    appStarted = true;
     checkSessionStatus();
     loadInitialChats();
     setupEventListeners();
     setupRealtimeEvents();
     startSmartPollingSync();
     refreshLucideIcons();
-  }
+  };
+
+  window.stopWahaApp = function () {
+    appStarted = false;
+    if (sseEventSource) {
+      try { sseEventSource.close(); } catch (e) { }
+      sseEventSource = null;
+    }
+  };
 
   function refreshLucideIcons() {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      try { window.lucide.createIcons(); } catch(e) {}
+      try { window.lucide.createIcons(); } catch (e) { }
     }
   }
 

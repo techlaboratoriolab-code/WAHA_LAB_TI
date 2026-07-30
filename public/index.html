@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lab Atendimento · WAHA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
   <!-- Phosphor Icons para ícones de apoio -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="colors_and_type.css">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <div class="app-container">
-    
+  <div class="app-container" style="display: none !important;">
+
     <!-- WORKSPACE RAIL (BARRA DE NAVEGAÇÃO ESQUERDA) -->
     <nav class="workspace-rail">
       <div class="rail-top">
@@ -28,12 +32,13 @@
         <button class="rail-btn active" title="Conversas / Mensagens">
           <i class="ph-bold ph-chat-teardrop-text"></i>
         </button>
-        <button class="rail-btn" id="new-chat-rail-trigger" onclick="document.getElementById('new-chat-btn').click()" title="Nova Conversa">
+        <button class="rail-btn" id="new-chat-rail-trigger" onclick="document.getElementById('new-chat-btn').click()"
+          title="Nova Conversa">
           <i class="ph-bold ph-plus-circle"></i>
         </button>
       </div>
       <div class="rail-bottom">
-        <button class="rail-btn" id="rail-toggle-theme" onclick="document.getElementById('toggle-theme-btn').click()" title="Alternar Tema">
+        <button class="rail-btn" id="rail-toggle-theme" title="Alternar Tema">
           <i class="ph-bold ph-moon-stars"></i>
         </button>
       </div>
@@ -41,23 +46,27 @@
 
     <!-- BARRA LATERAL (LISTA DE CHATS) -->
     <aside class="sidebar">
-      
+
       <!-- HEADER DA BARRA LATERAL -->
       <header class="sidebar-header">
         <div class="user-profile">
+          <div class="user-avatar-badge" id="auth-user-avatar">U</div>
           <div class="session-info">
             <div class="workspace-title-row">
-              <h3 id="session-name" class="text-gradient-brand">Lab Atendimento</h3>
-              <span class="status-badge" id="session-status" title="Status da Conexão">
+              <h3 id="auth-user-name" class="text-gradient-brand">Lab Atendimento</h3>
+              <span class="status-badge" id="session-status" title="Status da Conexão WAHA">
                 <span class="status-dot"></span>
-                <span id="session-status-text" class="hidden" style="display: none !important;"></span>
               </span>
+            </div>
+            <div class="user-meta-sub">
+              <span class="dept-badge" id="auth-user-dept">Carregando...</span>
+              <span id="auth-user-email" class="user-email-text"></span>
             </div>
           </div>
         </div>
 
         <div class="header-actions">
-          <button class="icon-btn" id="restart-session-btn" title="Reiniciar Conexão / Sessão">
+          <button class="icon-btn" id="restart-session-btn" title="Reiniciar Conexão WAHA">
             <i class="ph-bold ph-power"></i>
           </button>
           <button class="icon-btn" id="new-chat-btn" title="Nova conversa por número">
@@ -68,6 +77,9 @@
           </button>
           <button class="icon-btn" id="toggle-theme-btn" title="Alternar Tema Claro/Escuro">
             <i class="ph-bold ph-moon"></i>
+          </button>
+          <button class="icon-btn danger-icon-btn" id="auth-logout-btn" title="Sair da Conta (Logout)">
+            <i class="ph-bold ph-sign-out"></i>
           </button>
         </div>
       </header>
@@ -98,12 +110,12 @@
         <div class="chat-item-skeleton"></div>
         <div class="chat-item-skeleton"></div>
       </div>
-      
+
     </aside>
 
     <!-- ÁREA PRINCIPAL DA CONVERSA -->
     <main class="chat-view" id="chat-view">
-      
+
       <!-- ESTADO VAZIO -->
       <div class="empty-state" id="empty-state">
         <div class="empty-content">
@@ -124,7 +136,7 @@
 
       <!-- TELA DO CHAT ATIVO (ESCONDIDA POR PADRÃO) -->
       <div class="active-chat-container hidden" id="active-chat-container">
-        
+
         <!-- HEADER DO CHAT ATIVO -->
         <header class="chat-header">
           <div class="chat-header-info" id="chat-header-info">
@@ -181,7 +193,9 @@
                   <i class="ph-bold ph-paperclip"></i>
                   <span>Anexar Arquivo</span>
                 </button>
-                <input type="file" id="file-input" class="hidden" style="display: none !important; opacity: 0; position: absolute; pointer-events: none;" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip">
+                <input type="file" id="file-input" class="hidden"
+                  style="display: none !important; opacity: 0; position: absolute; pointer-events: none;"
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip">
               </div>
 
               <button class="send-btn" id="send-msg-btn" title="Enviar Mensagem">
@@ -245,6 +259,172 @@
   <!-- NOTIFICAÇÃO TOAST -->
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- TELA DE AUTENTICAÇÃO FLOW LAB (OVERLAY LOGIN) -->
+  <div class="flowlab-auth-overlay" id="flowlab-auth-overlay">
+    <div class="auth-split-container">
+
+      <!-- LADO ESQUERDO: BRANDING & CARROSSEL DE MÓDULOS -->
+      <div class="auth-left-banner" id="auth-carousel-container">
+        <!-- Animated Blob Backgrounds -->
+        <div class="auth-blob blob-1"></div>
+        <div class="auth-blob blob-2"></div>
+        <div class="auth-blob blob-3"></div>
+        <div class="auth-grid-pattern"></div>
+
+        <!-- Main Branding Card -->
+        <div class="auth-brand-card">
+          <div class="auth-logo-wrapper">
+            <div class="auth-logo-spin-ring"></div>
+            <div class="auth-logo-circle">
+              <span class="auth-logo-text-hero">LAB<span class="hero-dot">.</span></span>
+            </div>
+          </div>
+          <div class="auth-brand-text">
+            <h2>FlowLab</h2>
+            <p>Sistema de integração operacional do Laboratório Lab.</p>
+          </div>
+          <div class="auth-brand-divider"></div>
+          <div class="auth-badge-counter">
+            <span class="pulse-green-dot"></span>
+            <span>7 módulos integrados</span>
+          </div>
+        </div>
+
+        <!-- Module Carousel Card -->
+        <div class="auth-carousel-card">
+          <div class="carousel-slide-content">
+            <div class="carousel-icon-box">
+              <i class="ph-bold ph-squares-four carousel-icon-i" id="carousel-icon"></i>
+            </div>
+            <div class="carousel-text">
+              <h3 id="carousel-title">Dashboard</h3>
+              <p id="carousel-desc">Visão geral com indicadores, gráficos e métricas em tempo real do seu negócio.</p>
+            </div>
+          </div>
+
+          <!-- Carousel Controls -->
+          <div class="carousel-controls">
+            <button type="button" class="carousel-nav-btn" id="carousel-prev" title="Anterior">
+              <i class="ph-bold ph-caret-left"></i>
+            </button>
+            <div class="carousel-dots" id="carousel-dots"></div>
+            <button type="button" class="carousel-nav-btn" id="carousel-next" title="Próximo">
+              <i class="ph-bold ph-caret-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LADO DIREITO: FORMULÁRIO DE LOGIN E ACESSO -->
+      <div class="auth-right-panel">
+        <div class="auth-card-glass">
+
+          <button type="button" class="auth-theme-toggle" id="auth-theme-btn" title="Alternar Tema Claro/Escuro">
+            <i class="ph-bold ph-moon-stars"></i>
+          </button>
+
+          <!-- Error Alert Box -->
+          <div class="auth-error-box hidden" id="auth-error-msg"></div>
+
+          <!-- VIEW: LOGIN -->
+          <div class="auth-form-view" id="login-form-view">
+            <div class="auth-header-text">
+              <h1>Bem-vindo</h1>
+              <p>Faça login para continuar no FlowLab</p>
+            </div>
+
+            <form id="login-form" class="auth-form-body">
+              <div class="auth-field">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" placeholder="seu@email.com" required autocomplete="email">
+              </div>
+
+              <div class="auth-field">
+                <div class="field-label-row">
+                  <label for="login-password">Senha</label>
+                  <a href="#" id="show-forgot-btn" class="forgot-link">Esqueceu a senha?</a>
+                </div>
+                <div class="password-input-wrapper">
+                  <input type="password" id="login-password" placeholder="••••••••" required minlength="6"
+                    autocomplete="current-password">
+                  <button type="button" class="toggle-pass-btn" id="toggle-password-btn" title="Mostrar/Ocultar Senha">
+                    <i class="ph-bold ph-eye" id="toggle-password-icon"></i>
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" class="auth-submit-btn" id="login-submit-btn">
+                <i class="ph-bold ph-sign-in"></i> Entrar
+              </button>
+            </form>
+          </div>
+
+          <!-- VIEW: ESQUECI A SENHA -->
+          <div class="auth-form-view hidden" id="forgot-form-view">
+            <div class="auth-header-text">
+              <h1>Recuperar Senha</h1>
+              <p>Informe seu e-mail para receber as instruções</p>
+            </div>
+
+            <form id="forgot-form" class="auth-form-body">
+              <div class="auth-field">
+                <label for="forgot-email">Email Cadastrado</label>
+                <input type="email" id="forgot-email" placeholder="seu@email.com" required autocomplete="email">
+              </div>
+
+              <button type="submit" class="auth-submit-btn" id="forgot-submit-btn">
+                <i class="ph-bold ph-paper-plane-right"></i> Enviar Instruções
+              </button>
+
+              <div class="auth-back-link">
+                <a href="#" id="back-to-login-btn"><i class="ph-bold ph-arrow-left"></i> Voltar para o login</a>
+              </div>
+            </form>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TELA DE ACESSO RESTRITO (SEM PERMISSÃO canUseWhatsapp) -->
+  <div class="restricted-access-screen hidden" id="restricted-access-screen">
+    <div class="restricted-card-glass">
+      <div class="restricted-icon-hero">
+        <i class="ph-bold ph-shield-warning"></i>
+      </div>
+      <h2>Acesso Restrito ao WhatsApp</h2>
+      <p class="restricted-subtitle">Seu usuário não possui permissão para acessar este módulo.</p>
+
+      <div class="restricted-user-info">
+        <div class="info-row">
+          <span class="label">Usuário:</span>
+          <strong id="restricted-user-name">--</strong>
+        </div>
+        <div class="info-row">
+          <span class="label">E-mail:</span>
+          <span id="restricted-user-email">--</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Departamento:</span>
+          <span class="dept-chip" id="restricted-user-dept">--</span>
+        </div>
+      </div>
+
+      <div class="restricted-notice">
+        <i class="ph-bold ph-info"></i>
+        <span>Usuário sem permissão. Entre em contato com a equipe de TI ou administração.</span>
+      </div>
+
+      <button type="button" class="btn btn-secondary restricted-logout-btn" id="restricted-logout-btn">
+        <i class="ph-bold ph-sign-out"></i> Sair / Trocar de Conta
+      </button>
+    </div>
+  </div>
+
   <script src="app.js"></script>
+  <script src="auth.js"></script>
 </body>
+
 </html>

@@ -44,6 +44,172 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Servir frontend estático
 app.use(express.static(path.join(__dirname, 'public')));
 
+const { createClient } = require('@supabase/supabase-js');
+
+// Cliente Supabase no Servidor (Proxy Backend)
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+let supabaseServer = null;
+
+if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('seu-projeto')) {
+  supabaseServer = createClient(supabaseUrl, supabaseAnonKey);
+}
+
+// -----------------------------------------------------------------------------
+// ENDPOINTS DE AUTENTICAÇÃO FLOW LAB (BACKEND PROXY)
+// -----------------------------------------------------------------------------
+
+// 1. POST /api/auth/login — Autentica e consulta o perfil (Read-Only) no servidor
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
+    }
+
+    if (!supabaseServer) {
+      return res.status(500).json({ error: 'Supabase não configurado no .env do servidor.' });
+    }
+
+    // Autenticação no Supabase via Servidor
+    const { data, error } = await supabaseServer.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      let userFriendlyMsg = error.message;
+      if (error.message.includes('Invalid login credentials')) {
+        userFriendlyMsg = 'E-mail ou senha incorretos. Verifique suas credenciais.';
+      } else if (error.message.includes('Email not confirmed')) {
+        userFriendlyMsg = 'Confirme seu e-mail antes de fazer login.';
+      }
+      return res.status(401).json({ error: userFriendlyMsg });
+    }
+
+    const user = data.user;
+
+    // Consulta estrita (Read-Only) do perfil na tabela user_profiles
+    const { data: profileData, error: profileErr } = await supabaseServer
+      .from('user_profiles')
+      .select('*, custom_roles(id, name, permissions)')
+      .eq('id', user.id)
+      .single();
+
+    if (profileErr && profileErr.code !== 'PGRST116') {
+      console.error('Erro ao consultar perfil:', profileErr.message);
+    }
+
+    let permissions = [];
+    let role = 'requester';
+    let department = 'Não informado';
+    let name = user.user_metadata?.name || email.split('@')[0] || 'Usuário';
+
+    if (profileData) {
+      role = profileData.role || 'requester';
+      department = profileData.department || department;
+      name = profileData.name || name;
+
+      if (profileData.custom_roles && Array.isArray(profileData.custom_roles.permissions)) {
+        permissions = profileData.custom_roles.permissions;
+      }
+    }
+
+    // Avaliação da permissão canUseWhatsapp
+    const isAdmin = role === 'admin' || permissions.includes('*') || permissions.includes('all');
+    const hasWhatsappAccess = isAdmin || permissions.includes('canUseWhatsapp');
+
+    return res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name,
+        role,
+        department,
+        permissions
+      },
+      session: {
+        accessToken: data.session?.access_token
+      },
+      hasWhatsappAccess
+    });
+  } catch (err) {
+    console.error('Erro no login backend:', err.message);
+    return res.status(500).json({ error: 'Erro interno ao realizar autenticação.' });
+  }
+});
+
+// 2. POST /api/auth/forgot-password — Redefinição de Senha
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ error: 'Insira seu e-mail para recuperar a senha.' });
+    }
+
+    if (!supabaseServer) {
+      return res.status(500).json({ error: 'Supabase não configurado no .env.' });
+    }
+
+    const { error } = await supabaseServer.auth.resetPasswordForEmail(email, {
+      redirectTo: `${req.protocol}://${req.get('host')}/reset-password`
+    });
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    return res.json({ success: true, message: 'Instruções de redefinição de senha enviadas.' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao solicitar redefinição de senha.' });
+  }
+});
+
+// 3. POST /api/auth/verify-session — Validação de Sessão Salva
+app.post('/api/auth/verify-session', async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+    if (!userId || !supabaseServer) {
+      return res.status(401).json({ authenticated: false });
+    }
+
+    const { data: profileData, error: profileErr } = await supabaseServer
+      .from('user_profiles')
+      .select('*, custom_roles(id, name, permissions)')
+      .eq('id', userId)
+      .single();
+
+    if (profileErr || !profileData) {
+      return res.status(401).json({ authenticated: false });
+    }
+
+    let permissions = [];
+    if (profileData.custom_roles && Array.isArray(profileData.custom_roles.permissions)) {
+      permissions = profileData.custom_roles.permissions;
+    }
+
+    const isAdmin = profileData.role === 'admin' || permissions.includes('*') || permissions.includes('all');
+    const hasWhatsappAccess = isAdmin || permissions.includes('canUseWhatsapp');
+
+    return res.json({
+      authenticated: true,
+      user: {
+        id: profileData.id,
+        email: profileData.email,
+        name: profileData.name,
+        role: profileData.role,
+        department: profileData.department,
+        permissions
+      },
+      hasWhatsappAccess
+    });
+  } catch (err) {
+    return res.status(401).json({ authenticated: false });
+  }
+});
+
+
+
 // Helper para extrair preview legível de mensagem
 function extractMessagePreview(msg) {
   if (!msg) return { preview: '', fromMe: false, timestamp: null };
