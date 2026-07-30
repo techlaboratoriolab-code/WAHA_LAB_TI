@@ -562,9 +562,10 @@ app.get('/api/files/*', async (req, res) => {
   }
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`
+// Iniciar servidor (Local ou Vercel Serverless)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`
 ===========================================================
 🚀 INTERFACE WHATSAPP WEB WAHA RODANDO COM REAL-TIME E PREVIEW!
 ===========================================================
@@ -573,5 +574,8 @@ app.listen(PORT, () => {
 📍 Sessão WAHA:       "${WAHA_CONFIG.session}"
 📍 Endpoint Webhook:  http://localhost:${PORT}/api/webhook
 ===========================================================
-  `);
-});
+    `);
+  });
+}
+
+module.exports = app;
