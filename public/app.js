@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshChatsBtn = document.getElementById('refresh-chats-btn');
   const refreshMessagesBtn = document.getElementById('refresh-messages-btn');
   const copyNumberBtn = document.getElementById('copy-number-btn');
-  const toggleThemeBtn = document.getElementById('toggle-theme-btn');
 
   // ---------------------------------------------------------------------------
   // INICIALIZAÇÃO CONTROLADA VIA AUTENTICAÇÃO FLOW LAB
@@ -711,13 +710,6 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.clipboard.writeText(`+${cleanPhone}`);
         showToast('Número copiado para a área de transferência!');
       }
-    });
-
-    toggleThemeBtn.addEventListener('click', () => {
-      const currentTheme = document.documentElement.getAttribute('data-theme');
-      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      toggleThemeBtn.innerHTML = newTheme === 'light' ? '<i class="ph-bold ph-sun"></i>' : '<i class="ph-bold ph-moon"></i>';
     });
   }
 

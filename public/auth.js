@@ -45,19 +45,26 @@
 
   function updateThemeIcons(theme) {
     const isDark = theme === 'dark';
-    const iconClass = isDark ? 'ph-bold ph-moon-stars' : 'ph-bold ph-sun';
+    const iconClass = isDark ? 'ph-bold ph-sun' : 'ph-bold ph-moon-stars';
+    const titleText = isDark ? 'Alternar para Tema Claro' : 'Alternar para Tema Escuro';
 
     const railBtn = document.getElementById('rail-toggle-theme');
-    const headerBtn = document.getElementById('toggle-theme-btn');
     const authBtn = document.getElementById('auth-theme-btn');
 
-    if (railBtn) railBtn.innerHTML = `<i class="${iconClass}"></i>`;
-    if (headerBtn) headerBtn.innerHTML = `<i class="${iconClass}"></i>`;
-    if (authBtn) authBtn.innerHTML = `<i class="${iconClass}"></i>`;
+    if (railBtn) {
+      railBtn.innerHTML = `<i class="${iconClass}"></i>`;
+      railBtn.setAttribute('title', titleText);
+    }
+    if (authBtn) {
+      authBtn.innerHTML = `<i class="${iconClass}"></i>`;
+      authBtn.setAttribute('title', titleText);
+    }
   }
 
-  // 2. Carrossel de Módulos Flow Lab
+  // 2. Carrossel de Módulos Flow Lab (caso presente)
   function initCarousel() {
+    const carouselIcon = document.getElementById('carousel-icon');
+    if (!carouselIcon) return;
     renderSlide(0);
     renderDots();
     startAutoPlay();
@@ -182,7 +189,6 @@
 
     // Botões de Alternância de Tema Claro/Escuro
     document.getElementById('auth-theme-btn')?.addEventListener('click', toggleTheme);
-    document.getElementById('toggle-theme-btn')?.addEventListener('click', toggleTheme);
     document.getElementById('rail-toggle-theme')?.addEventListener('click', toggleTheme);
   }
 

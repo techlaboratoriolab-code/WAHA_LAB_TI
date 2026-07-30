@@ -219,22 +219,29 @@ body {
   background-color: var(--bg-header-surface);
   backdrop-filter: var(--blur-md);
   -webkit-backdrop-filter: var(--blur-md);
-  padding: 0 var(--s-4);
+  padding: 0 var(--s-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--s-2);
   border-bottom: 1px solid var(--border-app);
 }
 
 .user-profile {
   display: flex;
   align-items: center;
-  gap: var(--s-3);
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
+.user-avatar-badge,
 .avatar-session {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
   border-radius: var(--r-xl);
   background: var(--grad-primary-btn);
   color: #ffffff;
@@ -244,6 +251,8 @@ body {
   font-weight: 700;
   font-size: 0.9rem;
   box-shadow: var(--shadow-blue-glow);
+  flex-shrink: 0;
+  text-transform: uppercase;
 }
 
 .brand-avatar-text {
@@ -254,20 +263,33 @@ body {
 .session-info {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .workspace-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
 }
 
-.workspace-title-row h3 {
-  font-size: 1.05rem;
-  font-weight: 800;
+.workspace-title-row h3,
+#auth-user-name {
+  font-size: 0.95rem;
+  font-weight: 700;
   font-family: var(--font-display);
   letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  color: var(--text-main);
+  line-height: 1.2;
 }
 
 #session-status-text {
@@ -277,10 +299,11 @@ body {
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: var(--text-xs);
   color: var(--text-muted-custom);
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .status-dot {
@@ -301,16 +324,54 @@ body {
   color: var(--success-500);
 }
 
+.user-meta-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.dept-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  background-color: var(--bg-card-active);
+  color: var(--blue-500);
+  border: 1px solid var(--border-app-strong);
+  border-radius: var(--r-md);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+  flex-shrink: 0;
+}
+
+.user-email-text {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
 /* HEADER ACTIONS */
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--r-lg);
   background: transparent;
   border: none;
@@ -318,8 +379,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all var(--dur-fast) var(--ease-smooth);
 }
 
