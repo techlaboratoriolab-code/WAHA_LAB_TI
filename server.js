@@ -10,19 +10,32 @@ const PORT = process.env.PORT || 3000;
 
 // Configuração do WAHA
 const WAHA_CONFIG = {
-  url: process.env.WAHA_URL || '',
-  session: process.env.WAHA_SESSION || '',
-  apiKey: process.env.WAHA_API_KEY || '',
-  user: process.env.WAHA_USER || '',
-  password: process.env.WAHA_PASSWORD || ''
+  get url() {
+    let raw = process.env.WAHA_URL || 'https://waha.ngrok.dev';
+    raw = raw.trim().replace(/\/+$/, '');
+    if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+      raw = `https://${raw}`;
+    }
+    return raw;
+  },
+  get session() {
+    return (process.env.WAHA_SESSION || 'atendimento').trim();
+  },
+  get apiKey() {
+    return (process.env.WAHA_API_KEY || 'laboratorio-lab').trim();
+  },
+  get user() {
+    return (process.env.WAHA_USER || 'LAB').trim();
+  },
+  get password() {
+    return (process.env.WAHA_PASSWORD || 'lab0042').trim();
+  }
 };
-
-// Autenticação Basic Auth Base64
-const authStr = `${WAHA_CONFIG.user}:${WAHA_CONFIG.password}`;
-const b64Auth = Buffer.from(authStr).toString('base64');
 
 // Headers padrão para requisições ao WAHA
 function getWahaHeaders() {
+  const authStr = `${WAHA_CONFIG.user}:${WAHA_CONFIG.password}`;
+  const b64Auth = Buffer.from(authStr).toString('base64');
   return {
     'Content-Type': 'application/json',
     'X-Api-Key': WAHA_CONFIG.apiKey,
@@ -399,12 +412,39 @@ app.get('/api/chats/:chatId/messages', async (req, res) => {
   }
 });
 
+// Cache em memória para prevenção de envio duplicado (Deduplicação de Requisições)
+const recentSendsCache = new Map();
+
+function isDuplicateSendRequest(chatId, text) {
+  if (!chatId || !text) return false;
+  const key = `${chatId}:${text}`;
+  const now = Date.now();
+  const lastTime = recentSendsCache.get(key);
+
+  if (recentSendsCache.size > 200) {
+    for (const [k, v] of recentSendsCache.entries()) {
+      if (now - v > 10000) recentSendsCache.delete(k);
+    }
+  }
+
+  if (lastTime && (now - lastTime < 3000)) {
+    return true;
+  }
+  recentSendsCache.set(key, now);
+  return false;
+}
+
 // 5. Enviar mensagem de texto
 app.post('/api/send-text', async (req, res) => {
   try {
-    const { chatId, text } = req.body;
+    const { chatId, text, replyTo, reply_to } = req.body;
     if (!chatId || !text) {
       return res.status(400).json({ error: 'chatId e text são obrigatórios' });
+    }
+
+    if (isDuplicateSendRequest(chatId, text)) {
+      console.warn(`[DEDUPLICAÇÃO] Requisição duplicada ignorada para o chat ${chatId}: "${text}"`);
+      return res.json({ success: true, duplicated: true });
     }
 
     const payload = {
@@ -412,6 +452,11 @@ app.post('/api/send-text', async (req, res) => {
       chatId,
       text
     };
+
+    const targetReplyTo = replyTo || reply_to;
+    if (targetReplyTo) {
+      payload.reply_to = targetReplyTo;
+    }
 
     const response = await fetch(`${WAHA_CONFIG.url}/api/sendText`, {
       method: 'POST',
@@ -433,6 +478,14 @@ app.post('/api/send-text', async (req, res) => {
       });
       res.json({ success: true, data: resultJson });
     } else {
+      const errStr = JSON.stringify(resultJson);
+      if (errStr.includes('server returned error 400') || errStr.includes('gows')) {
+        console.warn(`[WAHA RECOVERY] Detectada falha no gRPC do WAHA. Solicitando reinício automático da sessão "${WAHA_CONFIG.session}"...`);
+        fetch(`${WAHA_CONFIG.url}/api/sessions/${WAHA_CONFIG.session}/restart`, {
+          method: 'POST',
+          headers: getWahaHeaders()
+        }).catch(e => console.error('Erro no auto-restart:', e.message));
+      }
       res.status(response.status).json({ success: false, error: resultJson, statusCode: response.status });
     }
   } catch (err) {
@@ -444,7 +497,7 @@ app.post('/api/send-text', async (req, res) => {
 // 6. Enviar arquivo / PDF / Mídia
 app.post('/api/send-file', upload.single('file'), async (req, res) => {
   try {
-    const { chatId, caption } = req.body;
+    const { chatId, caption, replyTo, reply_to } = req.body;
     if (!chatId || !req.file) {
       return res.status(400).json({ error: 'chatId e arquivo são obrigatórios' });
     }
@@ -465,6 +518,11 @@ app.post('/api/send-file', upload.single('file'), async (req, res) => {
 
     if (caption) {
       payload.caption = caption;
+    }
+
+    const targetReplyTo = replyTo || reply_to;
+    if (targetReplyTo) {
+      payload.reply_to = targetReplyTo;
     }
 
     const response = await fetch(`${WAHA_CONFIG.url}/api/sendFile`, {

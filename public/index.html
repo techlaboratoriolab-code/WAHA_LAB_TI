@@ -181,6 +181,20 @@
         <!-- CAIXA DE ENTRADA E ENVIO DE MENSAGEM -->
         <footer class="chat-input-area">
           <div class="input-box-container">
+            <!-- PAINEL DE RESPOSTA / CITAÇÃO DE MENSAGEM (INTERNO) -->
+            <div class="reply-preview-bar hidden" id="reply-preview-bar">
+              <div class="reply-preview-left">
+                <div class="reply-preview-accent"></div>
+                <div class="reply-preview-content">
+                  <span class="reply-preview-title" id="reply-preview-title"><i class="ph-bold ph-quotes"></i> Respondendo a Eu</span>
+                  <span class="reply-preview-text" id="reply-preview-text">...</span>
+                </div>
+              </div>
+              <button class="reply-preview-close" id="cancel-reply-btn" title="Cancelar resposta">
+                <i class="ph-bold ph-x"></i>
+              </button>
+            </div>
+
             <div class="message-input-wrapper">
               <textarea id="message-text-input" placeholder="Enviar mensagem..." rows="1"></textarea>
             </div>

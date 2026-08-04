@@ -44,6 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewFilesizeEl = document.getElementById('preview-filesize');
   const removeFileBtn = document.getElementById('remove-file-btn');
 
+  const replyPreviewBar = document.getElementById('reply-preview-bar');
+  const replyPreviewTitle = document.getElementById('reply-preview-title');
+  const replyPreviewText = document.getElementById('reply-preview-text');
+  const cancelReplyBtn = document.getElementById('cancel-reply-btn');
+
   const newChatBtn = document.getElementById('new-chat-btn');
   const restartSessionBtn = document.getElementById('restart-session-btn');
   const newChatModal = document.getElementById('new-chat-modal');
@@ -55,6 +60,60 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshChatsBtn = document.getElementById('refresh-chats-btn');
   const refreshMessagesBtn = document.getElementById('refresh-messages-btn');
   const copyNumberBtn = document.getElementById('copy-number-btn');
+
+  // ---------------------------------------------------------------------------
+  // GESTÃO DE RESPOSTA / CITAÇÃO DE MENSAGENS (REPLY / QUOTE)
+  // ---------------------------------------------------------------------------
+  let replyingToMsg = null;
+
+  function setReplyMessage(msg) {
+    if (!msg) return;
+    replyingToMsg = msg;
+
+    let senderName = 'Contato';
+    if (msg.fromMe === true) {
+      senderName = 'Eu';
+    } else if (msg.sender) {
+      const clean = msg.sender.replace(/[^0-9]/g, '');
+      if (clean.includes('67349533163598') || clean.includes('556132453766')) {
+        senderName = 'Eu';
+      } else {
+        senderName = clean.length > 8 ? formatPhoneNumber(clean) : msg.sender;
+      }
+    } else if (activeChat) {
+      senderName = activeChat.name || formatPhoneNumber(activeChat.id.replace('@c.us', ''));
+    }
+
+    let previewText = msg.body || msg.caption || '';
+    if (!previewText) {
+      const { mimetype } = getMediaInfoFromMsg(msg);
+      if (mimetype.startsWith('image/')) previewText = '📷 Foto';
+      else if (mimetype.startsWith('audio/') || msg.type === 'ptt' || msg.type === 'audio') previewText = '🎵 Áudio';
+      else if (mimetype.startsWith('video/')) previewText = '🎥 Vídeo';
+      else if (msg.hasMedia || msg.type === 'document' || mimetype.includes('pdf')) previewText = '📄 Documento PDF';
+      else previewText = '📎 Mídia';
+    }
+
+    if (replyPreviewTitle) {
+      replyPreviewTitle.innerHTML = `<i class="ph-bold ph-quotes"></i> Respondendo a ${escapeHtml(senderName)}`;
+    }
+    if (replyPreviewText) {
+      replyPreviewText.textContent = previewText;
+    }
+    if (replyPreviewBar) {
+      replyPreviewBar.classList.remove('hidden');
+    }
+    if (messageTextInput) {
+      messageTextInput.focus();
+    }
+  }
+
+  function clearReplyMessage() {
+    replyingToMsg = null;
+    if (replyPreviewBar) {
+      replyPreviewBar.classList.add('hidden');
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // INICIALIZAÇÃO CONTROLADA VIA AUTENTICAÇÃO FLOW LAB
@@ -408,6 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // SELEÇÃO E NAVEGAÇÃO DE CHAT
   // ---------------------------------------------------------------------------
   async function selectChat(chat) {
+    clearReplyMessage();
     lastRenderedChatId = chat.id;
     lastRenderedSignature = '';
 
@@ -447,6 +507,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ---------------------------------------------------------------------------
   // MENSAGENS DO CHAT
+  function getMsgId(m) {
+    if (!m) return '';
+    if (typeof m.id === 'object' && m.id) {
+      return m.id._serialized || m.id.id || JSON.stringify(m.id);
+    }
+    if (typeof m.id === 'string' && m.id) {
+      return m.id;
+    }
+    if (m.key && typeof m.key === 'object' && m.key.id) {
+      return m.key.id;
+    }
+    return `${m.timestamp || ''}_${m.fromMe ? '1' : '0'}_${(m.body || m.caption || '').slice(0, 30)}`;
+  }
+
   // ---------------------------------------------------------------------------
   async function loadMessages(chatId, silent = false) {
     try {
@@ -462,7 +536,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const messages = await res.json();
       
       if (activeChat && activeChat.id === chatId) {
-        const sortedMessages = Array.isArray(messages) ? [...messages].sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0)) : [];
+        // Deduplica mensagens recebidas por ID único
+        const uniqueMessages = [];
+        const seenIds = new Set();
+        (Array.isArray(messages) ? messages : []).forEach(m => {
+          const idStr = getMsgId(m);
+          if (!seenIds.has(idStr)) {
+            seenIds.add(idStr);
+            uniqueMessages.push(m);
+          }
+        });
+
+        const sortedMessages = uniqueMessages.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
         
         const latest = sortedMessages.length > 0 ? sortedMessages[sortedMessages.length - 1] : null;
         if (latest) {
@@ -471,7 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
           activeChat.lastActivity = latest.timestamp || activeChat.lastActivity;
         }
 
-        const newSignature = sortedMessages.map(m => `${m.id || ''}_${m.timestamp || ''}_${m.ack || ''}`).join('|');
+        const newSignature = sortedMessages.map(m => `${getMsgId(m)}_${m.timestamp || ''}_${m.ack || ''}`).join('|');
 
         // Se as mensagens forem exatamente as mesmas já exibidas, não re-renderiza o DOM (elimina o piscar)
         if (newSignature === lastRenderedSignature && messagesContainerEl.children.length > 0 && !messagesContainerEl.querySelector('.ph-spinner')) {
@@ -504,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let fileRelPath = msg.media?.url || msg._data?.url || msg.mediaUrl;
       
       if (!fileRelPath && msg.id) {
-        fileRelPath = `${msg.id}.bin`;
+        fileRelPath = `${getMsgId(msg)}.bin`;
       }
       
       if (fileRelPath) {
@@ -513,6 +598,66 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     return { mediaUrl, mimetype, filename };
+  }
+
+  function extractQuotedMessage(msg) {
+    if (!msg) return null;
+
+    // 1. Estrutura oficial WAHA (msg.replyTo)
+    if (msg.replyTo && typeof msg.replyTo === 'object') {
+      const q = msg.replyTo;
+      let text = q.body || '';
+      if (!text && q._data) {
+        text = q._data.conversation || q._data.extendedTextMessage?.text || q._data.imageMessage?.caption || q._data.videoMessage?.caption || q._data.documentMessage?.fileName || '';
+      }
+      if (!text) {
+        if (q.hasMedia || q.media || q._data?.imageMessage) text = '📷 Foto';
+        else if (q._data?.documentMessage) text = `📄 ${q._data.documentMessage.fileName || 'Documento PDF'}`;
+        else if (q._data?.audioMessage || q.type === 'audio' || q.type === 'ptt') text = '🎵 Áudio';
+        else if (q._data?.videoMessage) text = '🎥 Vídeo';
+        else text = '📎 Mensagem com mídia';
+      }
+      const sender = q.participant || q.from || q._data?.participant || '';
+      const fromMe = q.fromMe === true || q._data?.fromMe === true || (typeof q.id === 'string' && q.id.startsWith('true_')) || sender.includes('67349533163598') || sender.includes('556132453766');
+      return { text, sender, fromMe };
+    }
+
+    // 2. Estrutura _data.quotedMsg (WAHA / Baileys / WWebJS)
+    if (msg._data?.quotedMsg && typeof msg._data.quotedMsg === 'object') {
+      const qm = msg._data.quotedMsg;
+      let text = qm.body || qm.caption || '';
+      if (!text && qm._data) {
+        text = qm._data.conversation || qm._data.extendedTextMessage?.text || '';
+      }
+      if (!text) text = '📎 Mensagem';
+      const sender = qm.author || qm.from || '';
+      const fromMe = qm.fromMe === true || (typeof qm.id === 'string' && qm.id.startsWith('true_')) || sender.includes('67349533163598') || sender.includes('556132453766');
+      return { text, sender, fromMe };
+    }
+
+    // 3. Estrutura estendida WhatsApp Web ContextInfo
+    const contextInfo = msg._data?.Message?.extendedTextMessage?.contextInfo
+                     || msg._data?.Message?.imageMessage?.contextInfo
+                     || msg._data?.Message?.documentMessage?.contextInfo
+                     || msg._data?.Message?.audioMessage?.contextInfo
+                     || msg._data?.contextInfo;
+
+    if (contextInfo && contextInfo.quotedMessage) {
+      const qm = contextInfo.quotedMessage;
+      let text = qm.conversation || qm.extendedTextMessage?.text || qm.imageMessage?.caption || qm.videoMessage?.caption || qm.documentMessage?.fileName || '';
+      if (!text) {
+        if (qm.imageMessage) text = '📷 Foto';
+        else if (qm.documentMessage) text = `📄 ${qm.documentMessage.fileName || 'Documento PDF'}`;
+        else if (qm.audioMessage || qm.pttMessage) text = '🎵 Áudio';
+        else if (qm.videoMessage) text = '🎥 Vídeo';
+        else text = '📎 Mensagem';
+      }
+      const sender = contextInfo.participant || '';
+      const fromMe = contextInfo.fromMe === true || sender.includes('67349533163598') || sender.includes('556132453766');
+      return { text, sender, fromMe };
+    }
+
+    return null;
   }
 
   function renderMessages(messages) {
@@ -525,12 +670,28 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const sortedMessages = [...messages].sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+    // Deduplica e ordena mensagens antes de gerar os elementos no DOM
+    const uniqueMessages = [];
+    const seenIds = new Set();
+    messages.forEach(m => {
+      const idStr = getMsgId(m);
+      if (!seenIds.has(idStr)) {
+        seenIds.add(idStr);
+        uniqueMessages.push(m);
+      }
+    });
+
+    const sortedMessages = uniqueMessages.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
     const fragment = document.createDocumentFragment();
 
     sortedMessages.forEach(msg => {
-      const bubble = document.createElement('div');
       const isOutgoing = msg.fromMe === true;
+      
+      const row = document.createElement('div');
+      row.className = `message-row ${isOutgoing ? 'outgoing' : 'incoming'}`;
+      row.setAttribute('title', 'Clique duas vezes em qualquer lugar da linha para responder');
+
+      const bubble = document.createElement('div');
       bubble.className = `message-bubble ${isOutgoing ? 'outgoing' : 'incoming'}`;
 
       let bodyHtml = '';
@@ -569,9 +730,35 @@ document.addEventListener('DOMContentLoaded', () => {
         bodyHtml += `<div class="msg-text">${escapeHtml(msg.caption)}</div>`;
       }
 
+      // Renderizar caixa de resposta/citação (Quoted Message / Reply)
+      const quoted = extractQuotedMessage(msg);
+      let quotedHtml = '';
+      if (quoted && quoted.text) {
+        let qSenderName = 'Mensagem Respondida';
+        if (quoted.fromMe) {
+          qSenderName = 'Eu';
+        } else if (quoted.sender) {
+          const cleanPhone = quoted.sender.replace(/[^0-9]/g, '');
+          if (cleanPhone.includes('67349533163598') || cleanPhone.includes('556132453766')) {
+            qSenderName = 'Eu';
+          } else if (cleanPhone.length > 8) {
+            qSenderName = formatPhoneNumber(cleanPhone);
+          } else {
+            qSenderName = quoted.sender;
+          }
+        }
+        quotedHtml = `
+          <div class="msg-quoted-box">
+            <span class="msg-quoted-sender"><i class="ph-bold ph-quotes" style="margin-right: 4px;"></i>${escapeHtml(qSenderName)}</span>
+            <span class="msg-quoted-text">${escapeHtml(quoted.text)}</span>
+          </div>
+        `;
+      }
+
       const timeText = msg.timestamp ? formatMessageTime(msg.timestamp) : '';
 
       bubble.innerHTML = `
+        ${quotedHtml}
         ${bodyHtml}
         <div class="msg-footer">
           <span class="msg-time">${timeText}</span>
@@ -579,7 +766,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
-      fragment.appendChild(bubble);
+      row.appendChild(bubble);
+
+      // Clique duplo em QUALQUER ponto da linha da mensagem ativa a citação/resposta!
+      row.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        setReplyMessage(msg);
+      });
+
+      fragment.appendChild(row);
     });
 
     messagesContainerEl.innerHTML = '';
@@ -587,22 +782,37 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // ENVIAR MENSAGENS E ARQUIVOS
+  // ENVIAR MENSAGENS E ARQUIVOS (COM PROTEÇÃO CONTRA DUPLICAÇÃO)
   // ---------------------------------------------------------------------------
+  let isSendingMessage = false;
+
   async function sendMessage() {
-    if (!activeChat) return;
+    if (!activeChat || isSendingMessage) return;
 
     const text = messageTextInput.value.trim();
     if (!text && !selectedFile) return;
 
+    isSendingMessage = true;
     sendMsgBtn.disabled = true;
+    messageTextInput.disabled = true;
+
+    const originalText = messageTextInput.value;
+    const fileToSend = selectedFile;
+    const currentReplyMsg = replyingToMsg;
+
+    // Limpa otimistamente os campos para evitar envios repetidos
+    messageTextInput.value = '';
+    clearFileSelection();
+    clearReplyMessage();
+    autoResizeTextarea();
 
     try {
-      if (selectedFile) {
+      if (fileToSend) {
         const formData = new FormData();
         formData.append('chatId', activeChat.id);
-        formData.append('file', selectedFile);
+        formData.append('file', fileToSend);
         if (text) formData.append('caption', text);
+        if (currentReplyMsg) formData.append('replyTo', getMsgId(currentReplyMsg));
 
         const res = await fetch('/api/send-file', {
           method: 'POST',
@@ -612,28 +822,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
 
         if (res.ok && data.success) {
-          const fileNameStr = selectedFile.name;
+          const fileNameStr = fileToSend.name;
           activeChat.lastMessagePreview = text ? `📄 ${fileNameStr}: ${text}` : `📄 ${fileNameStr}`;
           activeChat.lastMessageFromMe = true;
           activeChat.lastActivity = Math.floor(Date.now() / 1000);
 
-          messageTextInput.value = '';
-          clearFileSelection();
-          autoResizeTextarea();
-          loadMessages(activeChat.id);
+          await loadMessages(activeChat.id, true);
           showToast('Arquivo enviado com sucesso!');
         } else {
+          // Restaura texto original se falhar
+          messageTextInput.value = originalText;
+          if (currentReplyMsg) setReplyMessage(currentReplyMsg);
+          autoResizeTextarea();
           const errMsg = data.error?.exception?.message || data.error?.message || data.error?.error || 'Falha na requisição';
           showToast(`Erro ao enviar arquivo: ${errMsg}`, 'error');
         }
       } else {
+        const payload = {
+          chatId: activeChat.id,
+          text
+        };
+        if (currentReplyMsg) {
+          payload.replyTo = getMsgId(currentReplyMsg);
+        }
+
         const res = await fetch('/api/send-text', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chatId: activeChat.id,
-            text
-          })
+          body: JSON.stringify(payload)
         });
 
         const data = await res.json();
@@ -643,19 +859,27 @@ document.addEventListener('DOMContentLoaded', () => {
           activeChat.lastMessageFromMe = true;
           activeChat.lastActivity = Math.floor(Date.now() / 1000);
 
-          messageTextInput.value = '';
-          autoResizeTextarea();
-          loadMessages(activeChat.id);
+          await loadMessages(activeChat.id, true);
         } else {
+          // Restaura texto original se falhar
+          messageTextInput.value = originalText;
+          if (currentReplyMsg) setReplyMessage(currentReplyMsg);
+          autoResizeTextarea();
           const errMsg = data.error?.exception?.message || data.error?.message || data.error?.error || 'Falha no envio';
           showToast(`Erro ao enviar mensagem: ${errMsg}`, 'error');
         }
       }
     } catch (err) {
       console.error('Erro ao enviar:', err);
+      messageTextInput.value = originalText;
+      if (currentReplyMsg) setReplyMessage(currentReplyMsg);
+      autoResizeTextarea();
       showToast('Erro de rede ao enviar mensagem', 'error');
     } finally {
+      isSendingMessage = false;
       sendMsgBtn.disabled = false;
+      messageTextInput.disabled = false;
+      messageTextInput.focus();
     }
   }
 
@@ -663,6 +887,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // EVENT LISTENERS E INTERAÇÕES
   // ---------------------------------------------------------------------------
   function setupEventListeners() {
+    if (cancelReplyBtn) {
+      cancelReplyBtn.addEventListener('click', clearReplyMessage);
+    }
     searchInput.addEventListener('input', handleSearch);
     clearSearchBtn.addEventListener('click', () => {
       searchInput.value = '';
