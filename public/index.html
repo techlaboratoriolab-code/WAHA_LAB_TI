@@ -181,6 +181,17 @@
         <!-- CAIXA DE ENTRADA E ENVIO DE MENSAGEM -->
         <footer class="chat-input-area">
           <div class="input-box-container">
+            <!-- PAINEL DE AUTOCOMPLETE DE ATALHOS / SLASH -->
+            <div class="slash-autocomplete-popover hidden" id="slash-autocomplete-popover">
+              <div class="slash-autocomplete-header">
+                <span class="slash-title"><i class="ph-bold ph-lightning"></i> Sugestões de Atalho</span>
+                <span class="slash-hint-badge">Pressione <kbd>TAB ↹</kbd> ou <kbd>ENTER ↵</kbd> para completar</span>
+              </div>
+              <div class="slash-autocomplete-list" id="slash-autocomplete-list">
+                <!-- Itens gerados dinamicamente via JS -->
+              </div>
+            </div>
+
             <!-- PAINEL DE RESPOSTA / CITAÇÃO DE MENSAGEM (INTERNO) -->
             <div class="reply-preview-bar hidden" id="reply-preview-bar">
               <div class="reply-preview-left">
@@ -196,7 +207,7 @@
             </div>
 
             <div class="message-input-wrapper">
-              <textarea id="message-text-input" placeholder="Enviar mensagem..." rows="1"></textarea>
+              <textarea id="message-text-input" placeholder="Enviar mensagem... (Digite / para respostas rápidas)" rows="1"></textarea>
             </div>
             <div class="input-toolbar">
               <div class="input-actions-left">
@@ -207,6 +218,11 @@
                 <input type="file" id="file-input" class="hidden"
                   style="display: none !important; opacity: 0; position: absolute; pointer-events: none;"
                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip">
+
+                <button class="quick-resp-btn-styled" id="open-quick-resp-btn" onclick="window.openQuickResponsesModal && window.openQuickResponsesModal()" title="Abrir Respostas Rápidas (Atalho /)">
+                  <i class="ph-bold ph-lightning"></i>
+                  <span>Respostas Rápidas</span>
+                </button>
               </div>
 
               <button class="send-btn" id="send-msg-btn" title="Enviar Mensagem">
@@ -263,6 +279,77 @@
       </div>
       <div class="modal-body viewer-body" id="viewer-content-body">
         <!-- Conteúdo do preview inserido dinamicamente pelo JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SELETOR DE RESPOSTAS RÁPIDAS -->
+  <div class="modal-backdrop hidden" id="quick-responses-modal">
+    <div class="modal-card modal-quick-resp-card">
+      <div class="modal-header">
+        <div class="viewer-title-box">
+          <i class="ph-bold ph-lightning" style="color: var(--brand-400);"></i>
+          <span>Respostas Rápidas (Atalho /)</span>
+        </div>
+        <button class="icon-btn" id="close-quick-resp-modal-btn" title="Fechar (ESC)">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+      <div class="modal-body quick-resp-modal-body">
+        <div class="quick-resp-search-wrapper">
+          <i class="ph-bold ph-magnifying-glass search-icon"></i>
+          <input type="text" id="quick-resp-search-input" placeholder="Buscar por palavra-chave, título ou conteúdo (ex: guia, atraso, pix)..." autocomplete="off">
+          <button class="clear-search-btn hidden" id="clear-quick-resp-search">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+
+        <!-- Categorias de filtro -->
+        <div class="quick-resp-categories" id="quick-resp-categories">
+          <!-- Botões de categoria gerados via JS -->
+        </div>
+
+        <!-- Lista de cartões de respostas rápidas -->
+        <div class="quick-resp-list" id="quick-resp-list">
+          <!-- Cartões gerados via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PREENCHER INFORMAÇÕES EDITÁVEIS (VARIÁVEIS) -->
+  <div class="modal-backdrop hidden" id="variable-fill-modal">
+    <div class="modal-card modal-variable-fill-card">
+      <div class="modal-header">
+        <div class="viewer-title-box">
+          <i class="ph-bold ph-pencil-simple-line" style="color: var(--brand-400);"></i>
+          <span id="var-fill-modal-title">Preencher Dados da Mensagem</span>
+        </div>
+        <button class="icon-btn" id="close-var-fill-modal-btn" title="Fechar (ESC)">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+      <div class="modal-body variable-fill-body">
+        <p class="var-fill-intro" id="var-fill-intro">
+          Esta mensagem contém campos personalizáveis. Preencha as informações abaixo para atualizar o texto em tempo real:
+        </p>
+
+        <!-- Campos de input dinâmicos gerados por JS -->
+        <div class="var-fields-container" id="var-fields-container"></div>
+
+        <!-- Previa em Tempo Real -->
+        <div class="var-preview-container">
+          <label class="var-preview-label"><i class="ph-bold ph-eye"></i> Pré-visualização da Mensagem Final:</label>
+          <div class="var-preview-box" id="var-preview-box"></div>
+        </div>
+      </div>
+      <div class="modal-footer var-fill-footer">
+        <button class="btn btn-secondary" id="var-fill-insert-btn">
+          <i class="ph-bold ph-pencil-simple"></i> Inserir no Campo de Texto
+        </button>
+        <button class="btn btn-primary" id="var-fill-send-btn">
+          <i class="ph-bold ph-paper-plane-right"></i> Enviar Mensagem Direto
+        </button>
       </div>
     </div>
   </div>
@@ -405,6 +492,7 @@
     </div>
   </div>
 
+  <script src="quick_responses.js"></script>
   <script src="app.js"></script>
   <script src="auth.js"></script>
 </body>

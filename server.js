@@ -333,43 +333,78 @@ app.get('/api/chats', async (req, res) => {
     const offset = req.query.offset || 0;
     const sortBy = req.query.sortBy || 'conversationTimestamp';
     const sortOrder = req.query.sortOrder || 'desc';
+
     const url = `${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats?limit=${limit}&offset=${offset}&sortBy=${sortBy}&sortOrder=${sortOrder}`;
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getWahaHeaders()
-    });
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: getWahaHeaders()
+      });
+    } catch (fetchErr) {
+      console.error('Erro de conexão ao buscar chats no WAHA:', fetchErr.message);
+      return res.status(502).json({ error: 'Não foi possível conectar ao servidor WAHA.' });
+    }
 
     if (!response.ok) {
-      const errText = await response.text();
+      const errText = await response.text().catch(() => 'Erro na resposta do WAHA');
       return res.status(response.status).json({ error: errText });
     }
-    const chats = await response.json();
 
-    // Enriquecer em paralelo com a preview da última mensagem
-    const enrichedChats = await Promise.all(chats.map(async (chat) => {
-      try {
-        const encodedId = encodeURIComponent(chat.id);
-        const msgRes = await fetch(`${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats/${encodedId}/messages?limit=1`, {
-          method: 'GET',
-          headers: getWahaHeaders()
-        });
-        if (msgRes.ok) {
-          const msgs = await msgRes.json();
-          if (Array.isArray(msgs) && msgs.length > 0) {
-            const { preview, fromMe, timestamp } = extractMessagePreview(msgs[0]);
+    const chatsData = await response.json().catch(() => []);
+    const chats = Array.isArray(chatsData) ? chatsData : [];
+
+    if (chats.length === 0) {
+      return res.json([]);
+    }
+
+    // Processamento em lotes de 10 requisições simultâneas para evitar estourar o ngrok
+    const BATCH_SIZE = 10;
+    const enrichedChats = [];
+
+    for (let i = 0; i < chats.length; i += BATCH_SIZE) {
+      const batch = chats.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(async (chat) => {
+        if (!chat || !chat.id) return chat;
+        try {
+          if (chat.lastMessage) {
+            const { preview, fromMe, timestamp } = extractMessagePreview(chat.lastMessage);
             chat.lastMessagePreview = preview;
             chat.lastMessageFromMe = fromMe;
-            if (timestamp) {
-              chat.lastActivity = timestamp;
+            if (timestamp) chat.lastActivity = timestamp;
+            return chat;
+          }
+
+          const encodedId = encodeURIComponent(chat.id);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+          const msgRes = await fetch(`${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats/${encodedId}/messages?limit=1`, {
+            method: 'GET',
+            headers: getWahaHeaders(),
+            signal: controller.signal
+          }).catch(() => null);
+
+          clearTimeout(timeoutId);
+
+          if (msgRes && msgRes.ok) {
+            const msgs = await msgRes.json().catch(() => []);
+            if (Array.isArray(msgs) && msgs.length > 0) {
+              const { preview, fromMe, timestamp } = extractMessagePreview(msgs[0]);
+              chat.lastMessagePreview = preview;
+              chat.lastMessageFromMe = fromMe;
+              if (timestamp) chat.lastActivity = timestamp;
             }
           }
+        } catch (e) {
+          // Ignora falhas individuais em previews
         }
-      } catch (e) {
-        // Falha individual na preview não bloqueia o chat
-      }
-      return chat;
-    }));
+        return chat;
+      }));
+
+      enrichedChats.push(...batchResults);
+    }
 
     res.json(enrichedChats);
   } catch (err) {

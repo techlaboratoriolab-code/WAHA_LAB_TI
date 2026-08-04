@@ -126,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkSessionStatus();
     loadInitialChats();
     setupEventListeners();
+    setupQuickResponsesUI();
     setupRealtimeEvents();
     startSmartPollingSync();
     refreshLucideIcons();
@@ -491,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await loadMessages(chat.id);
     markChatAsSeen(chat.id);
-    
+
     messageTextInput.focus();
   }
 
@@ -725,9 +726,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (msg.body && !msg.hasMedia && !mimetype.startsWith('image/')) {
-        bodyHtml += `<div class="msg-text">${escapeHtml(msg.body)}</div>`;
+        bodyHtml += `<div class="msg-text">${formatWhatsAppText(msg.body)}</div>`;
       } else if (msg.caption && (mimetype.startsWith('image/') || mimetype.startsWith('video/'))) {
-        bodyHtml += `<div class="msg-text">${escapeHtml(msg.caption)}</div>`;
+        bodyHtml += `<div class="msg-text">${formatWhatsAppText(msg.caption)}</div>`;
       }
 
       // Renderizar caixa de resposta/citação (Quoted Message / Reply)
@@ -750,7 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
         quotedHtml = `
           <div class="msg-quoted-box">
             <span class="msg-quoted-sender"><i class="ph-bold ph-quotes" style="margin-right: 4px;"></i>${escapeHtml(qSenderName)}</span>
-            <span class="msg-quoted-text">${escapeHtml(quoted.text)}</span>
+            <span class="msg-quoted-text">${formatWhatsAppText(quoted.text)}</span>
           </div>
         `;
       }
@@ -896,8 +897,44 @@ document.addEventListener('DOMContentLoaded', () => {
       handleSearch();
     });
 
-    messageTextInput.addEventListener('input', autoResizeTextarea);
+    messageTextInput.addEventListener('input', () => {
+      autoResizeTextarea();
+      updateSlashAutocomplete();
+    });
+
     messageTextInput.addEventListener('keydown', (e) => {
+      const popover = document.getElementById('slash-autocomplete-popover');
+      const isPopoverVisible = popover && !popover.classList.contains('hidden');
+
+      if (isPopoverVisible && currentSlashMatches.length > 0) {
+        if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          const selected = currentSlashMatches[selectedSlashIndex] || currentSlashMatches[0];
+          acceptSlashSuggestion(selected);
+          return;
+        }
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectedSlashIndex = (selectedSlashIndex + 1) % currentSlashMatches.length;
+          renderSlashAutocompleteList();
+          return;
+        }
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectedSlashIndex = (selectedSlashIndex - 1 + currentSlashMatches.length) % currentSlashMatches.length;
+          renderSlashAutocompleteList();
+          return;
+        }
+
+        if (e.key === 'Escape') {
+          popover.classList.add('hidden');
+          return;
+        }
+      }
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
@@ -906,6 +943,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' || e.key === 'Esc') {
+        const quickRespModal = document.getElementById('quick-responses-modal');
+        if (quickRespModal && !quickRespModal.classList.contains('hidden')) {
+          quickRespModal.classList.add('hidden');
+          return;
+        }
+
+        const varFillModal = document.getElementById('variable-fill-modal');
+        if (varFillModal && !varFillModal.classList.contains('hidden')) {
+          varFillModal.classList.add('hidden');
+          return;
+        }
+
         const viewerModal = document.getElementById('file-viewer-modal');
         if (viewerModal && !viewerModal.classList.contains('hidden')) {
           window.closeFileViewer();
@@ -1163,6 +1212,465 @@ document.addEventListener('DOMContentLoaded', () => {
       toast.style.transition = 'opacity 0.3s ease';
       setTimeout(() => toast.remove(), 300);
     }, 4500);
+  }
+
+  // ---------------------------------------------------------------------------
+  // RESPOSTAS RÁPIDAS & PREENCHIMENTO DE VARIÁVEIS EDITÁVEIS
+  // ---------------------------------------------------------------------------
+  let currentFillTemplate = null;
+  let activeQuickCategory = 'Todas';
+
+  function setupQuickResponsesUI() {
+    const openQuickBtn = document.getElementById('open-quick-resp-btn');
+    const closeQuickModalBtn = document.getElementById('close-quick-resp-modal-btn');
+    const quickRespModal = document.getElementById('quick-responses-modal');
+    const quickSearchInput = document.getElementById('quick-resp-search-input');
+    const clearQuickSearchBtn = document.getElementById('clear-quick-resp-search');
+
+    const closeVarModalBtn = document.getElementById('close-var-fill-modal-btn');
+    const varFillModal = document.getElementById('variable-fill-modal');
+    const varInsertBtn = document.getElementById('var-fill-insert-btn');
+    const varSendBtn = document.getElementById('var-fill-send-btn');
+
+    if (openQuickBtn) {
+      openQuickBtn.addEventListener('click', openQuickResponsesModal);
+    }
+    if (closeQuickModalBtn) {
+      closeQuickModalBtn.addEventListener('click', () => quickRespModal.classList.add('hidden'));
+    }
+    if (quickRespModal) {
+      quickRespModal.addEventListener('click', (e) => {
+        if (e.target === quickRespModal) quickRespModal.classList.add('hidden');
+      });
+    }
+
+    if (quickSearchInput) {
+      quickSearchInput.addEventListener('input', () => {
+        const q = quickSearchInput.value.trim();
+        if (clearQuickSearchBtn) {
+          if (q) clearQuickSearchBtn.classList.remove('hidden');
+          else clearQuickSearchBtn.classList.add('hidden');
+        }
+        filterQuickResponses();
+      });
+    }
+
+    if (clearQuickSearchBtn) {
+      clearQuickSearchBtn.addEventListener('click', () => {
+        quickSearchInput.value = '';
+        clearQuickSearchBtn.classList.add('hidden');
+        filterQuickResponses();
+      });
+    }
+
+    if (closeVarModalBtn) {
+      closeVarModalBtn.addEventListener('click', () => varFillModal.classList.add('hidden'));
+    }
+    if (varFillModal) {
+      varFillModal.addEventListener('click', (e) => {
+        if (e.target === varFillModal) varFillModal.classList.add('hidden');
+      });
+    }
+
+    if (varInsertBtn) {
+      varInsertBtn.addEventListener('click', () => {
+        const text = buildFinalFormattedMessage();
+        if (text) {
+          messageTextInput.value = text;
+          varFillModal.classList.add('hidden');
+          autoResizeTextarea();
+          messageTextInput.focus();
+        }
+      });
+    }
+
+    if (varSendBtn) {
+      varSendBtn.addEventListener('click', async () => {
+        const text = buildFinalFormattedMessage();
+        if (text) {
+          messageTextInput.value = text;
+          varFillModal.classList.add('hidden');
+          autoResizeTextarea();
+          await sendMessage();
+        }
+      });
+    }
+
+    renderQuickCategories();
+  }
+
+  function openQuickResponsesModal() {
+    const modal = document.getElementById('quick-responses-modal');
+    const input = document.getElementById('quick-resp-search-input');
+    if (!modal) return;
+
+    if (messageTextInput && messageTextInput.value.startsWith('/')) {
+      const query = messageTextInput.value.slice(1).trim();
+      if (input) input.value = query;
+    }
+
+    modal.classList.remove('hidden');
+    renderQuickCategories();
+    filterQuickResponses();
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+  window.openQuickResponsesModal = openQuickResponsesModal;
+
+  function renderQuickCategories() {
+    const container = document.getElementById('quick-resp-categories');
+    if (!container) return;
+
+    const responsesList = (typeof QUICK_RESPONSES !== 'undefined') ? QUICK_RESPONSES : [];
+    const categoriesSet = new Set(['Todas']);
+    responsesList.forEach(r => { if (r.category) categoriesSet.add(r.category); });
+
+    container.innerHTML = '';
+    categoriesSet.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = `quick-cat-btn ${activeQuickCategory === cat ? 'active' : ''}`;
+      btn.textContent = cat;
+      btn.onclick = () => {
+        activeQuickCategory = cat;
+        renderQuickCategories();
+        filterQuickResponses();
+      };
+      container.appendChild(btn);
+    });
+  }
+
+  function filterQuickResponses() {
+    const listEl = document.getElementById('quick-resp-list');
+    const searchInput = document.getElementById('quick-resp-search-input');
+    if (!listEl) return;
+
+    const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const responsesList = (typeof QUICK_RESPONSES !== 'undefined') ? QUICK_RESPONSES : [];
+
+    const filtered = responsesList.filter(item => {
+      const matchesCat = (activeQuickCategory === 'Todas' || item.category === activeQuickCategory);
+      if (!matchesCat) return false;
+
+      if (!q) return true;
+      const title = (item.title || '').toLowerCase();
+      const id = (item.id || '').toLowerCase();
+      const text = (item.text || '').toLowerCase();
+      const tags = (item.tags || []).join(' ').toLowerCase();
+
+      return title.includes(q) || id.includes(q) || text.includes(q) || tags.includes(q);
+    });
+
+    renderQuickResponsesList(filtered);
+  }
+
+  function renderQuickResponsesList(items) {
+    const listEl = document.getElementById('quick-resp-list');
+    if (!listEl) return;
+
+    if (!items || items.length === 0) {
+      listEl.innerHTML = '<div style="grid-column: 1/-1; padding: 40px; text-align: center; color: var(--text-muted-custom);">Nenhuma resposta rápida encontrada com o termo buscado.</div>';
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    items.forEach(item => {
+      const vars = extractPlaceholders(item.text);
+      const hasVars = vars.length > 0;
+
+      const card = document.createElement('div');
+      card.className = 'quick-resp-card';
+
+      card.innerHTML = `
+        <div class="quick-resp-card-header">
+          <div>
+            <div class="quick-resp-card-title">${escapeHtml(item.title)}</div>
+            <div class="quick-resp-card-key">/${escapeHtml(item.id)}</div>
+          </div>
+          <span class="quick-resp-badge ${hasVars ? 'editable' : 'direct'}">
+            ${hasVars ? '<i class="ph-bold ph-pencil-simple"></i> Preencher Informações' : '<i class="ph-bold ph-lightning"></i> Envio Direto'}
+          </span>
+        </div>
+        <div class="quick-resp-card-preview">${formatWhatsAppText(item.text)}</div>
+        <div class="quick-resp-card-actions">
+          <button class="btn-card-action secondary" title="Inserir na caixa de mensagem">
+            <i class="ph-bold ph-pencil-simple"></i> Inserir
+          </button>
+          <button class="btn-card-action primary" title="${hasVars ? 'Preencher dados e enviar' : 'Enviar agora ao cliente'}">
+            <i class="ph-bold ${hasVars ? 'ph-pencil-simple-line' : 'ph-paper-plane-right'}"></i>
+            ${hasVars ? 'Preencher e Enviar' : 'Enviar Direto'}
+          </button>
+        </div>
+      `;
+
+      const insertBtn = card.querySelector('.btn-card-action.secondary');
+      const sendBtn = card.querySelector('.btn-card-action.primary');
+
+      insertBtn.onclick = (e) => {
+        e.stopPropagation();
+        document.getElementById('quick-responses-modal').classList.add('hidden');
+        if (hasVars) {
+          openVariableFillModal(item, false);
+        } else {
+          messageTextInput.value = item.text;
+          autoResizeTextarea();
+          messageTextInput.focus();
+        }
+      };
+
+      sendBtn.onclick = (e) => {
+        e.stopPropagation();
+        document.getElementById('quick-responses-modal').classList.add('hidden');
+        executeQuickResponse(item, true);
+      };
+
+      fragment.appendChild(card);
+    });
+
+    listEl.innerHTML = '';
+    listEl.appendChild(fragment);
+  }
+
+  function executeQuickResponse(item, forceDirectSend = false) {
+    const vars = extractPlaceholders(item.text);
+    if (vars.length > 0) {
+      openVariableFillModal(item, forceDirectSend);
+    } else {
+      messageTextInput.value = item.text;
+      autoResizeTextarea();
+      if (forceDirectSend) {
+        sendMessage();
+      } else {
+        messageTextInput.focus();
+      }
+    }
+  }
+
+  function openVariableFillModal(item, autoSendOnSubmit = false) {
+    currentFillTemplate = item;
+
+    const modal = document.getElementById('variable-fill-modal');
+    const titleEl = document.getElementById('var-fill-modal-title');
+    const fieldsContainer = document.getElementById('var-fields-container');
+    if (!modal || !fieldsContainer) return;
+
+    if (titleEl) titleEl.textContent = `Preencher Dados — ${item.title}`;
+
+    const placeholders = extractPlaceholders(item.text);
+    fieldsContainer.innerHTML = '';
+
+    // Auto-preenchimento inteligente de variáveis conhecidas
+    const defaultPatientName = (activeChat && activeChat.name) ? activeChat.name : '';
+
+    function getFirstAndLastName(fullName) {
+      if (!fullName) return '';
+      const clean = fullName.replace(/Lab Atendimento/i, '').trim();
+      const parts = clean.split(/\s+/).filter(p => p.length > 0);
+      if (parts.length === 0) return '';
+      if (parts.length === 1) return parts[0];
+      return `${parts[0]} ${parts[parts.length - 1]}`;
+    }
+
+    const rawStaffName = (window.currentUser && window.currentUser.name) || document.getElementById('auth-user-name')?.textContent || '';
+    const defaultStaffName = getFirstAndLastName(rawStaffName) || 'Atendente';
+
+    placeholders.forEach((ph, idx) => {
+      const group = document.createElement('div');
+      group.className = 'var-field-group';
+
+      let suggestedVal = '';
+      const nameLower = ph.name.toLowerCase();
+
+      if (nameLower.includes('paciente') || nameLower.includes('nome da sra') || nameLower.includes('nome do paciente')) {
+        suggestedVal = defaultPatientName;
+      } else if (nameLower.includes('seu nome') || nameLower.includes('atendente') || nameLower.includes('me chamo')) {
+        suggestedVal = defaultStaffName;
+      }
+
+      group.innerHTML = `
+        <label for="var-input-${idx}">
+          <i class="ph-bold ph-pencil"></i> <strong>${escapeHtml(ph.name)}</strong>
+        </label>
+        <input type="text" id="var-input-${idx}" data-raw="${escapeHtml(ph.rawMatch)}" data-name="${escapeHtml(ph.name)}" value="${escapeHtml(suggestedVal)}" placeholder="Digite ${escapeHtml(ph.name)}..." autocomplete="off" />
+      `;
+
+      const inputEl = group.querySelector('input');
+      inputEl.addEventListener('input', updateVariableLivePreview);
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const allInputs = Array.from(fieldsContainer.querySelectorAll('input'));
+          const emptyInput = allInputs.find(inp => !inp.value.trim());
+
+          if (emptyInput) {
+            emptyInput.focus();
+            emptyInput.select();
+          } else {
+            const varSendBtn = document.getElementById('var-fill-send-btn');
+            if (varSendBtn) varSendBtn.click();
+          }
+        }
+      });
+
+      fieldsContainer.appendChild(group);
+    });
+
+    modal.classList.remove('hidden');
+    updateVariableLivePreview();
+
+    // Focar no primeiro campo vazio (ou primeiro campo)
+    setTimeout(() => {
+      const allInputs = Array.from(fieldsContainer.querySelectorAll('input'));
+      const targetInput = allInputs.find(inp => !inp.value.trim()) || allInputs[0];
+      if (targetInput) {
+        targetInput.focus();
+        targetInput.select();
+      }
+    }, 100);
+  }
+
+  function updateVariableLivePreview() {
+    const previewBox = document.getElementById('var-preview-box');
+    if (!previewBox || !currentFillTemplate) return;
+
+    const formattedText = buildFinalFormattedMessage();
+    previewBox.innerHTML = formatWhatsAppText(formattedText);
+  }
+
+  function formatWhatsAppText(str) {
+    if (!str) return '';
+    let safe = escapeHtml(str);
+
+    // Formatação de Negrito estilo WhatsApp (*texto* ou **texto**)
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    safe = safe.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
+
+    // Itálico (_texto_)
+    safe = safe.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+    // Tachado (~texto~)
+    safe = safe.replace(/~([^~]+)~/g, '<del>$1</del>');
+
+    // Código/Monospaçado (```codigo``` ou `codigo`)
+    safe = safe.replace(/```([^`]+)```/g, '<code>$1</code>');
+    safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    return safe;
+  }
+
+  function buildFinalFormattedMessage() {
+    if (!currentFillTemplate) return '';
+
+    let text = currentFillTemplate.text;
+    const fieldsContainer = document.getElementById('var-fields-container');
+    if (!fieldsContainer) return text;
+
+    const inputs = fieldsContainer.querySelectorAll('input');
+    inputs.forEach(input => {
+      const rawMatch = input.getAttribute('data-raw');
+      const val = input.value.trim();
+      if (rawMatch) {
+        const replacement = val !== '' ? val : rawMatch;
+        text = text.split(rawMatch).join(replacement);
+      }
+    });
+
+    return text;
+  }
+
+  // ---------------------------------------------------------------------------
+  // SLASH AUTOCOMPLETE EM TEMPO REAL E TECLA TAB / ENTER
+  // ---------------------------------------------------------------------------
+  let currentSlashMatches = [];
+  let selectedSlashIndex = 0;
+
+  function updateSlashAutocomplete() {
+    const popover = document.getElementById('slash-autocomplete-popover');
+    const listEl = document.getElementById('slash-autocomplete-list');
+    if (!popover || !listEl || !messageTextInput) return;
+
+    const text = messageTextInput.value;
+
+    if (!text.startsWith('/')) {
+      popover.classList.add('hidden');
+      currentSlashMatches = [];
+      selectedSlashIndex = 0;
+      return;
+    }
+
+    const query = text.slice(1).trim().toLowerCase();
+    const responsesList = (typeof QUICK_RESPONSES !== 'undefined') ? QUICK_RESPONSES : [];
+
+    currentSlashMatches = responsesList.filter(item => {
+      if (!query) return true;
+      const title = (item.title || '').toLowerCase();
+      const id = (item.id || '').toLowerCase();
+      const tags = (item.tags || []).join(' ').toLowerCase();
+      return id.includes(query) || title.includes(query) || tags.includes(query);
+    }).slice(0, 5);
+
+    if (currentSlashMatches.length === 0) {
+      popover.classList.add('hidden');
+      return;
+    }
+
+    if (selectedSlashIndex >= currentSlashMatches.length) {
+      selectedSlashIndex = 0;
+    }
+
+    renderSlashAutocompleteList();
+    popover.classList.remove('hidden');
+  }
+
+  function renderSlashAutocompleteList() {
+    const listEl = document.getElementById('slash-autocomplete-list');
+    if (!listEl) return;
+
+    const fragment = document.createDocumentFragment();
+
+    currentSlashMatches.forEach((item, idx) => {
+      const vars = extractPlaceholders(item.text);
+      const hasVars = vars.length > 0;
+
+      const row = document.createElement('div');
+      row.className = `slash-item ${idx === selectedSlashIndex ? 'active' : ''}`;
+      row.innerHTML = `
+        <div class="slash-item-left">
+          <span class="slash-item-key">/${escapeHtml(item.id)}</span>
+          <span class="slash-item-title">${escapeHtml(item.title)}</span>
+        </div>
+        <span class="slash-item-badge ${hasVars ? 'editable' : 'direct'}">
+          ${hasVars ? '<i class="ph-bold ph-pencil-simple"></i> Preencher Informações' : '<i class="ph-bold ph-lightning"></i> Envio Direto'}
+        </span>
+      `;
+
+      row.addEventListener('click', () => {
+        acceptSlashSuggestion(item);
+      });
+
+      fragment.appendChild(row);
+    });
+
+    listEl.innerHTML = '';
+    listEl.appendChild(fragment);
+  }
+
+  function acceptSlashSuggestion(item) {
+    const popover = document.getElementById('slash-autocomplete-popover');
+    if (popover) popover.classList.add('hidden');
+
+    const vars = extractPlaceholders(item.text);
+    if (vars.length > 0) {
+      messageTextInput.value = '';
+      autoResizeTextarea();
+      openVariableFillModal(item, false);
+    } else {
+      messageTextInput.value = item.text;
+      autoResizeTextarea();
+      messageTextInput.focus();
+    }
   }
 
 });
