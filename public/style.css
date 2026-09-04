@@ -658,8 +658,8 @@ body {
 }
 
 .brand-logo-hero {
-  width: 80px;
-  height: 80px;
+  width: 140px;
+  height: 140px;
   border-radius: var(--r-2xl);
   background: var(--bg-card-item);
   border: 1px solid var(--border-app-strong);
@@ -671,8 +671,11 @@ body {
 
 .hero-lab-title {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 0.95rem;
   font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  padding: 0 8px;
   color: var(--blue-900);
 }
 
@@ -1684,8 +1687,8 @@ body {
 
 .auth-logo-wrapper {
   position: relative;
-  width: 100px;
-  height: 100px;
+  width: 160px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1708,8 +1711,8 @@ body {
 }
 
 .auth-logo-circle {
-  width: 90px;
-  height: 90px;
+  width: 140px;
+  height: 140px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(8px);
@@ -1722,7 +1725,10 @@ body {
 .auth-logo-text-hero {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 800;
-  font-size: 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.1;
+  text-align: center;
+  padding: 0 8px;
   letter-spacing: -0.5px;
   color: #ffffff;
 }
