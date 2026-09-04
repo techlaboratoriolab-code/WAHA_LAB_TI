@@ -669,6 +669,15 @@ body {
   box-shadow: var(--shadow-xl);
 }
 
+.brand-logo-hero-img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: var(--r-2xl);
+  position: relative;
+  z-index: 2;
+}
+
 .hero-lab-title {
   font-family: var(--font-display);
   font-size: 0.95rem;
@@ -1720,6 +1729,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.auth-logo-img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: var(--r-2xl);
+  position: relative;
+  z-index: 2;
 }
 
 .auth-logo-text-hero {
