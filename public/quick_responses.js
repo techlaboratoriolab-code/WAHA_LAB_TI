@@ -115,21 +115,21 @@ const QUICK_RESPONSES = [
     title: 'Plano em Carência',
     category: 'Convênios',
     tags: ['carência', 'plano', 'particular'],
-    text: 'Olá, Sr(a). [Nome do Paciente]! Falo em nome do Laboratório LAB. Recebemos sua amostra para o exame de [Nome do Exame], que foi coletada na [Nome da Clínica Parceira]. Ao processarmos sua guia junto ao convênio [Nome do Convênio], fomos informados que o seu plano está no período de carência para este procedimento. Para que você não precise aguardar o fim da carência e possa dar continuidade ao seu diagnóstico, nossa equipe comercial entrará em contato com o(a) senhor(a) em até 24 horas para oferecer uma condição especial e personalizada para a realização do exame. Atenciosamente, Equipe Laboratório LAB'
+    text: 'Olá, Sr(a). [Nome do Paciente]! Falo em nome do Laboratório LAB. Recebemos sua amostra para o exame de [Nome do Exame], que foi coletada na [Nome da Clínica Parceira]. Ao processarmos sua guia junto ao convênio [Nome do Convênio], fomos informados que o seu plano está no período de carência para este procedimento. Para que você não precise aguardar o fim da carência e possa dar continuidade ao seu diagnóstico, nossa equipe comercial entrará em contato com o(a) senhor(a) em até 24 horas para oferecer uma condição especial e personalizada para a realização do exame. Atenciosamente, Equipe de TI - Laboratório LAB'
   },
   {
     id: 'AutorizouEmPartes',
     title: 'Autorização Parcial pelo Convênio',
     category: 'Convênios',
     tags: ['autorização parcial', 'aprovado', 'negado'],
-    text: 'Olá, Sr(a). [Nome do Paciente]! Falo em nome do Laboratório LAB. Recebemos sua amostra para os exames, que foi coletada na [Nome da Clínica Parceira]. Ao processarmos sua guia junto ao convênio [Nome do Convênio], recebemos uma autorização parcial. O exame [Nome do Exame APROVADO] foi autorizado, porém, o exame [Nome do Exame NEGADO] não teve cobertura. Para que a senhora possa realizar seu diagnóstico completo, nossa equipe comercial entrará em contato em até 24 horas para oferecer uma condição especial para a realização do exame [Nome do Exame NEGADO]. Atenciosamente, Equipe Laboratório LAB'
+    text: 'Olá, Sr(a). [Nome do Paciente]! Falo em nome do Laboratório LAB. Recebemos sua amostra para os exames, que foi coletada na [Nome da Clínica Parceira]. Ao processarmos sua guia junto ao convênio [Nome do Convênio], recebemos uma autorização parcial. O exame [Nome do Exame APROVADO] foi autorizado, porém, o exame [Nome do Exame NEGADO] não teve cobertura. Para que a senhora possa realizar seu diagnóstico completo, nossa equipe comercial entrará em contato em até 24 horas para oferecer uma condição especial para a realização do exame [Nome do Exame NEGADO]. Atenciosamente, Equipe de TI - Laboratório LAB'
   },
   {
     id: 'ConvenioNãoAutorizou',
     title: 'Convênio Não Autorizou Exame',
     category: 'Convênios',
     tags: ['não autorizou', 'negado', 'particular'],
-    text: 'Olá, Sr(a). [Nome do Paciente]! Falo em nome do Laboratório LAB. Recebemos sua amostra para o(s) exame(s) de [Nome do Exame], coletada na [Nome da Clínica Parceira]. Ao submetermos sua guia para aprovação junto ao convênio [Nome do Convênio], fomos informados que a autorização para este(s) procedimento(s) não foi concedida. Mas, para que o(a) senhor(a) possa dar continuidade ao seu diagnóstico, nossa equipe comercial entrará em contato em até 24 horas para oferecer uma condição especial e personalizada para a realização do(s) exame(s) de forma particular. Atenciosamente, Equipe Laboratório LAB'
+    text: 'Olá, Sr(a). [Nome do Paciente]! Falo em nome do Laboratório LAB. Recebemos sua amostra para o(s) exame(s) de [Nome do Exame], coletada na [Nome da Clínica Parceira]. Ao submetermos sua guia para aprovação junto ao convênio [Nome do Convênio], fomos informados que a autorização para este(s) procedimento(s) não foi concedida. Mas, para que o(a) senhor(a) possa dar continuidade ao seu diagnóstico, nossa equipe comercial entrará em contato em até 24 horas para oferecer uma condição especial e personalizada para a realização do(s) exame(s) de forma particular. Atenciosamente, Equipe de TI - Laboratório LAB'
   },
 
   // --- LAUDOS & RESULTADOS ---
@@ -173,7 +173,7 @@ const QUICK_RESPONSES = [
     title: 'Solicitação da Clínica CONFIANCE',
     category: 'Laudos & Exames',
     tags: ['confiance', 'protocolo'],
-    text: 'Olá, [Nome do Paciente]. Informamos que recebemos sua solicitação de exame com sucesso, encaminhada pela Clínica CONFIANCE. Segue abaixo o protocolo de acesso para que você possa acompanhar os resultados. Qualquer dúvida, ficamos à disposição. Atenciosamente, Equipe LAB.'
+    text: 'Olá, [Nome do Paciente]. Informamos que recebemos sua solicitação de exame com sucesso, encaminhada pela Clínica CONFIANCE. Segue abaixo o protocolo de acesso para que você possa acompanhar os resultados. Qualquer dúvida, ficamos à disposição. Atenciosamente, Equipe de TI - Laboratório LAB'
   },
   {
     id: 'atraso',
@@ -208,7 +208,7 @@ const QUICK_RESPONSES = [
     title: 'Solicitação de Busca de Laudo Antigo',
     category: 'Laudos & Exames',
     tags: ['laudo antigo', 'arquivo', '7 dias'],
-    text: 'Para laudos mais antigos, precisamos realizar uma busca detalhada em nosso sistema de arquivo digital. Para garantir que encontraremos o documento correto, por favor, poderia me informar os seguintes dados?\nNome completo:\nCPF:\nData de nascimento:\nO ano aproximado em que o exame foi realizado:\nCom essas informações, nossa equipe iniciará a busca. Como é um processo manual em nosso arquivo, pedimos um prazo de até 7 dias úteis para localizar e enviar o seu laudo. Faremos o possível para te enviar o quanto antes! Agradecemos a sua compreensão e paciência. Atenciosamente, Equipe Laboratório LAB'
+    text: 'Para laudos mais antigos, precisamos realizar uma busca detalhada em nosso sistema de arquivo digital. Para garantir que encontraremos o documento correto, por favor, poderia me informar os seguintes dados?\nNome completo:\nCPF:\nData de nascimento:\nO ano aproximado em que o exame foi realizado:\nCom essas informações, nossa equipe iniciará a busca. Como é um processo manual em nosso arquivo, pedimos um prazo de até 7 dias úteis para localizar e enviar o seu laudo. Faremos o possível para te enviar o quanto antes! Agradecemos a sua compreensão e paciência. Atenciosamente, Equipe de TI - Laboratório LAB'
   },
   {
     id: 'laudoauditoria',
@@ -328,7 +328,7 @@ const QUICK_RESPONSES = [
     title: 'Pesquisa Pós Coleta de Sangue',
     category: 'Pesquisas & Encerramento',
     tags: ['coleta', 'pesquisa', 'feedback'],
-    text: 'Olá, [Nome do Paciente], Esperamos que esteja bem! Gostaríamos de saber como foi sua experiência com nosso atendimento na coleta de sangue do Laboratório LAB. Sua opinião é muito importante para nós! Caso tenha alguma observação ou sugestão, fique à vontade para compartilhar. Estamos sempre em busca de oferecer o melhor serviço para você. Se precisar de algo, conte com a nossa equipe. Estamos à disposição! Atenciosamente, Equipe Laboratório LAB.'
+    text: 'Olá, [Nome do Paciente], Esperamos que esteja bem! Gostaríamos de saber como foi sua experiência com nosso atendimento na coleta de sangue do Laboratório LAB. Sua opinião é muito importante para nós! Caso tenha alguma observação ou sugestão, fique à vontade para compartilhar. Estamos sempre em busca de oferecer o melhor serviço para você. Se precisar de algo, conte com a nossa equipe. Estamos à disposição! Atenciosamente, Equipe de TI - Laboratório LAB.'
   },
   {
     id: 'encerramento1',

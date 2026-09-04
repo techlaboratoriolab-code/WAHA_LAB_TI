@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const session = data.session || {};
       const status = (session.status || 'OFFLINE').toUpperCase();
 
-      if (sessionNameEl) sessionNameEl.textContent = 'Lab Atendimento';
+      if (sessionNameEl) sessionNameEl.textContent = 'WhatsApp Lab TI';
       if (sessionStatusTextEl) sessionStatusTextEl.textContent = status;
 
       if (status === 'WORKING' || status === 'CONNECTED') {
@@ -1466,7 +1466,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getFirstAndLastName(fullName) {
       if (!fullName) return '';
-      const clean = fullName.replace(/Lab Atendimento/i, '').trim();
+      const clean = fullName.replace(/WhatsApp Lab TI/i, '').trim();
       const parts = clean.split(/\s+/).filter(p => p.length > 0);
       if (parts.length === 0) return '';
       if (parts.length === 1) return parts[0];
