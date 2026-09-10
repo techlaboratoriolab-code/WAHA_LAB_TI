@@ -1209,6 +1209,41 @@ body {
   gap: 8px;
 }
 
+.format-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-xl);
+  background: var(--bg-input-field);
+  border: 1px solid var(--border-app);
+}
+
+.format-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-lg);
+  background: transparent;
+  border: none;
+  color: var(--text-sub);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-smooth);
+}
+
+.format-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-main);
+}
+
+.format-btn.active {
+  background: var(--blue-500);
+  color: #ffffff;
+}
+
 .attach-btn-styled {
   display: inline-flex;
   align-items: center;

@@ -1141,6 +1141,68 @@ document.addEventListener('DOMContentLoaded', () => {
     messageTextInput.style.height = Math.min(messageTextInput.scrollHeight, 120) + 'px';
   }
 
+  // ---------------------------------------------------------------------------
+  // FORMATAÇÃO DE TEXTO NO CAMPO DE DIGITAÇÃO (SINTAXE NATIVA DO WHATSAPP)
+  // ---------------------------------------------------------------------------
+  const FORMAT_MARKERS = {
+    bold: { prefix: '*', suffix: '*' },
+    italic: { prefix: '_', suffix: '_' },
+    strike: { prefix: '~', suffix: '~' },
+    code: { prefix: '```', suffix: '```' }
+  };
+
+  function matchFormatShortcut(e) {
+    if (!(e.ctrlKey || e.metaKey)) return null;
+    const key = e.key.toLowerCase();
+    if (!e.shiftKey && key === 'b') return 'bold';
+    if (!e.shiftKey && key === 'i') return 'italic';
+    if (e.shiftKey && key === 'x') return 'strike';
+    if (e.shiftKey && key === 'm') return 'code';
+    return null;
+  }
+
+  function applyTextFormat(formatKey) {
+    const marker = FORMAT_MARKERS[formatKey];
+    if (!marker) return;
+
+    const { prefix, suffix } = marker;
+    const textarea = messageTextInput;
+    textarea.focus();
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    const selected = value.slice(start, end);
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+
+    const surroundedOutside = before.endsWith(prefix) && after.startsWith(suffix);
+    const wrappedInside = selected.length >= prefix.length + suffix.length &&
+      selected.startsWith(prefix) && selected.endsWith(suffix);
+
+    let newValue, newStart, newEnd;
+
+    if (surroundedOutside) {
+      newValue = before.slice(0, before.length - prefix.length) + selected + after.slice(suffix.length);
+      newStart = start - prefix.length;
+      newEnd = end - prefix.length;
+    } else if (wrappedInside) {
+      const inner = selected.slice(prefix.length, selected.length - suffix.length);
+      newValue = before + inner + after;
+      newStart = start;
+      newEnd = start + inner.length;
+    } else {
+      newValue = before + prefix + selected + suffix + after;
+      newStart = start + prefix.length;
+      newEnd = newStart + selected.length;
+    }
+
+    textarea.value = newValue;
+    textarea.setSelectionRange(newStart, newEnd);
+    autoResizeTextarea();
+    updateSlashAutocomplete();
+  }
+
   function scrollToBottom() {
     setTimeout(() => {
       messagesContainerEl.scrollTop = messagesContainerEl.scrollHeight;
