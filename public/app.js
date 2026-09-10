@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let hasMoreChats = true;
   let isLoadingChats = false;
 
+  let justArrivedChatId = null; // Chat que acabou de receber mensagem (para animar o badge)
+  const baseDocumentTitle = document.title;
+
   // ---------------------------------------------------------------------------
   // ELEMENTOS DO DOM
   // ---------------------------------------------------------------------------
@@ -154,6 +157,17 @@ document.addEventListener('DOMContentLoaded', () => {
     return [...messages].sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))[0];
   }
 
+  function updateDocumentTitleWithUnread() {
+    const totalUnread = chats.reduce((sum, c) => sum + (Number(c.unreadCount) || 0), 0);
+    document.title = totalUnread > 0 ? `(${totalUnread}) ${baseDocumentTitle}` : baseDocumentTitle;
+  }
+
+  function notifyNewMessage(chatId, chatName, previewText) {
+    const isChatOpen = activeChat && activeChat.id === chatId && document.hasFocus();
+    if (isChatOpen) return;
+    showToast(`💬 ${chatName}: ${previewText || 'Nova mensagem'}`, 'info');
+  }
+
   function extractPreviewFromMessage(msg) {
     if (!msg) return '';
     let preview = msg.body || '';
@@ -243,32 +257,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const { chatId, message, preview, fromMe, timestamp } = eventData;
     if (!chatId) return;
 
+    const previewText = preview || extractPreviewFromMessage(message);
+    const isChatCurrentlyOpen = activeChat && activeChat.id === chatId;
+
     let existingChat = chats.find(c => c.id === chatId);
     if (existingChat) {
-      existingChat.lastMessagePreview = preview || extractPreviewFromMessage(message);
+      existingChat.lastMessagePreview = previewText;
       existingChat.lastMessageFromMe = fromMe;
       existingChat.lastActivity = timestamp || Math.floor(Date.now() / 1000);
-      if (activeChat && activeChat.id === chatId && !fromMe) {
+      if (isChatCurrentlyOpen && !fromMe) {
         // Já aberto
       } else if (!fromMe) {
-        existingChat.unreadCount = (existingChat.unreadCount || 0) + 1;
+        existingChat.unreadMessages = [...(existingChat.unreadMessages || []), { preview: previewText, timestamp: existingChat.lastActivity }];
+        existingChat.unreadCount = existingChat.unreadMessages.length;
       }
     } else {
       const newChatObj = {
         id: chatId,
         name: message?.sender?.pushname || formatPhoneNumber(chatId.replace('@c.us', '')),
         unreadCount: fromMe ? 0 : 1,
-        lastMessagePreview: preview || extractPreviewFromMessage(message),
+        unreadMessages: fromMe ? [] : [{ preview: previewText, timestamp: timestamp || Math.floor(Date.now() / 1000) }],
+        lastMessagePreview: previewText,
         lastMessageFromMe: fromMe,
         lastActivity: timestamp || Math.floor(Date.now() / 1000)
       };
       chats.unshift(newChatObj);
+      existingChat = newChatObj;
     }
 
     chats.sort((a, b) => (Number(b.lastActivity) || 0) - (Number(a.lastActivity) || 0));
-    renderChatsList(searchInput.value.trim() !== '' ? filterChatsLocally(searchInput.value.trim()) : chats);
 
-    if (activeChat && activeChat.id === chatId) {
+    if (!fromMe && !isChatCurrentlyOpen) {
+      justArrivedChatId = chatId;
+      notifyNewMessage(chatId, existingChat.name, previewText);
+    }
+
+    renderChatsList(searchInput.value.trim() !== '' ? filterChatsLocally(searchInput.value.trim()) : chats);
+    updateDocumentTitleWithUnread();
+
+    if (isChatCurrentlyOpen) {
       loadMessages(chatId, true);
       markChatAsSeen(chatId);
     }
@@ -300,11 +327,21 @@ document.addEventListener('DOMContentLoaded', () => {
             existing.lastMessagePreview = incoming.lastMessagePreview;
             changed = true;
           }
+          if (incoming.picture && incoming.picture !== existing.picture) {
+            existing.picture = incoming.picture;
+            changed = true;
+          }
+          if (incoming.name && incoming.name !== existing.name) {
+            existing.name = incoming.name;
+            changed = true;
+          }
           if (typeof incoming.unreadCount === 'number' && incoming.unreadCount !== existing.unreadCount) {
             if (activeChat && activeChat.id === incoming.id) {
               existing.unreadCount = 0;
+              existing.unreadMessages = [];
             } else {
               existing.unreadCount = incoming.unreadCount;
+              existing.unreadMessages = incoming.unreadMessages || [];
               changed = true;
             }
           }
@@ -315,6 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chats.sort((a, b) => (Number(b.lastActivity || b.conversationTimestamp) || 0) - (Number(a.lastActivity || a.conversationTimestamp) || 0));
         const query = searchInput.value.trim();
         renderChatsList(query ? filterChatsLocally(query) : chats);
+        updateDocumentTitleWithUnread();
       }
     } catch (err) {
       console.warn('Erro ao sincronizar chats silenciosamente:', err);
@@ -385,6 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const query = searchInput.value.trim();
       renderChatsList(query ? filterChatsLocally(query) : chats);
+      updateDocumentTitleWithUnread();
     } catch (err) {
       console.error('Erro ao carregar chats:', err);
       if (chats.length === 0) {
@@ -439,8 +478,10 @@ document.addEventListener('DOMContentLoaded', () => {
         previewText = `Você: ${previewText}`;
       }
 
+      const justArrived = chat.id === justArrivedChatId;
+
       chatItem.innerHTML = `
-        <div class="avatar" style="${avatarStyle}">${avatarInitial}</div>
+        <div class="avatar" style="${avatarStyle}">${avatarInitial}${avatarPictureTag(chat.picture)}</div>
         <div class="chat-info">
           <div class="chat-top-row">
             <span class="chat-name">${escapeHtml(displayName)}</span>
@@ -448,17 +489,142 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="chat-bottom-row">
             <span class="chat-preview-text" title="${escapeHtml(previewText)}">${escapeHtml(previewText)}</span>
-            ${chat.unreadCount > 0 ? `<span class="unread-badge">${chat.unreadCount}</span>` : ''}
+            ${chat.unreadCount > 0 ? `<span class="unread-badge${justArrived ? ' just-arrived' : ''}">${chat.unreadCount}</span>` : ''}
           </div>
         </div>
       `;
 
       chatItem.addEventListener('click', () => selectChat(chat));
+      chatItem.addEventListener('mouseenter', () => showChatHoverPreview(chatItem, displayName, previewText, lastTime));
+      chatItem.addEventListener('mouseleave', () => {
+        // Não fecha se o popover estiver no modo interativo (lista rolável do
+        // clique direito) — só o hover simples fecha ao tirar o mouse do item.
+        if (!isContextPreviewOpen()) hideChatPreviewPopover();
+      });
+      chatItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showChatContextPreview(e.clientX, e.clientY, displayName, chat, previewText, lastTime);
+      });
       fragment.appendChild(chatItem);
     });
 
     chatsListEl.innerHTML = '';
     chatsListEl.appendChild(fragment);
+
+    if (justArrivedChatId) {
+      justArrivedChatId = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // PREVIEW DA CONVERSA: HOVER (última mensagem, lida ou não) E BOTÃO DIREITO
+  // (lista completa de mensagens não visualizadas, rolável)
+  // ---------------------------------------------------------------------------
+  let chatPreviewPopoverEl = null;
+  let chatHoverPreviewTimer = null;
+
+  function isContextPreviewOpen() {
+    return !!chatPreviewPopoverEl &&
+      chatPreviewPopoverEl.classList.contains('interactive') &&
+      chatPreviewPopoverEl.classList.contains('visible');
+  }
+
+  function ensureChatPreviewPopoverEl() {
+    if (chatPreviewPopoverEl) return chatPreviewPopoverEl;
+    chatPreviewPopoverEl = document.createElement('div');
+    chatPreviewPopoverEl.className = 'chat-preview-popover';
+    document.body.appendChild(chatPreviewPopoverEl);
+    return chatPreviewPopoverEl;
+  }
+
+  function clampPopoverToViewport(popover) {
+    requestAnimationFrame(() => {
+      const rect = popover.getBoundingClientRect();
+      if (rect.bottom > window.innerHeight) {
+        popover.style.top = `${Math.max(8, window.innerHeight - rect.height - 8)}px`;
+      }
+    });
+  }
+
+  function renderPopoverHeader(displayName, lastTime) {
+    return `
+      <div class="chat-preview-popover-header">
+        <span class="chat-preview-popover-name">${escapeHtml(displayName)}</span>
+        <span class="chat-preview-popover-time">${lastTime}</span>
+      </div>
+    `;
+  }
+
+  // Hover: mostra sempre a última mensagem (lida ou não), sem interatividade.
+  function showChatHoverPreview(itemEl, displayName, previewText, lastTime) {
+    clearTimeout(chatHoverPreviewTimer);
+    chatHoverPreviewTimer = setTimeout(() => {
+      const popover = ensureChatPreviewPopoverEl();
+      popover.classList.remove('interactive');
+      popover.innerHTML = `
+        ${renderPopoverHeader(displayName, lastTime)}
+        <div class="chat-preview-popover-body">${escapeHtml(previewText || 'Sem mensagens ainda.')}</div>
+      `;
+
+      const rect = itemEl.getBoundingClientRect();
+      const popoverWidth = 300;
+      let left = rect.right + 10;
+      if (left + popoverWidth > window.innerWidth) {
+        left = Math.max(8, rect.left - popoverWidth - 10);
+      }
+      popover.style.left = `${left}px`;
+      popover.style.top = `${rect.top}px`;
+      popover.classList.add('visible');
+      clampPopoverToViewport(popover);
+    }, 350);
+  }
+
+  // Botão direito: mostra todas as mensagens ainda não visualizadas, com rolagem
+  // quando houver muitas (ex: 22 mensagens).
+  function showChatContextPreview(clientX, clientY, displayName, chat, previewText, lastTime) {
+    clearTimeout(chatHoverPreviewTimer);
+    const popover = ensureChatPreviewPopoverEl();
+    const unreadMessages = Array.isArray(chat.unreadMessages) ? chat.unreadMessages : [];
+    const isInteractive = unreadMessages.length > 0;
+
+    let bodyHtml;
+    if (isInteractive) {
+      bodyHtml = `
+        <div class="chat-preview-popover-unread-label">
+          ${unreadMessages.length} mensage${unreadMessages.length !== 1 ? 'ns' : 'm'} não visualizada${unreadMessages.length !== 1 ? 's' : ''}
+        </div>
+        <div class="chat-preview-popover-list">
+          ${unreadMessages.map(m => `
+            <div class="chat-preview-popover-item">
+              <span class="chat-preview-popover-item-time">${formatMessageTime(m.timestamp)}</span>
+              <span class="chat-preview-popover-item-text">${escapeHtml(m.preview || 'Mensagem sem prévia')}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      bodyHtml = `<div class="chat-preview-popover-body">${escapeHtml(previewText || 'Sem mensagens ainda.')}</div>`;
+    }
+
+    popover.classList.toggle('interactive', isInteractive);
+    popover.innerHTML = `${renderPopoverHeader(displayName, lastTime)}${bodyHtml}`;
+
+    const popoverWidth = 300;
+    let left = clientX;
+    if (left + popoverWidth > window.innerWidth) {
+      left = Math.max(8, window.innerWidth - popoverWidth - 8);
+    }
+    popover.style.left = `${left}px`;
+    popover.style.top = `${clientY}px`;
+    popover.classList.add('visible');
+    clampPopoverToViewport(popover);
+  }
+
+  function hideChatPreviewPopover() {
+    clearTimeout(chatHoverPreviewTimer);
+    if (chatPreviewPopoverEl) {
+      chatPreviewPopoverEl.classList.remove('visible');
+    }
   }
 
   let lastRenderedChatId = null;
@@ -474,13 +640,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     activeChat = chat;
     activeChat.unreadCount = 0;
+    activeChat.unreadMessages = [];
+    updateDocumentTitleWithUnread();
 
     const rawNumber = chat.id.replace('@c.us', '').replace('@g.us', '');
     const displayName = chat.name || formatPhoneNumber(rawNumber);
 
     activeChatNameEl.textContent = displayName;
     activeChatIdEl.textContent = `+${rawNumber}`;
-    activeAvatarEl.textContent = displayName.charAt(0).toUpperCase();
+    activeAvatarEl.innerHTML = `${displayName.charAt(0).toUpperCase()}${avatarPictureTag(chat.picture)}`;
 
     const bgHue = Math.abs(hashCode(chat.id)) % 360;
     activeAvatarEl.style.cssText = `background: hsl(${bgHue}, 60%, 40%);`;
@@ -897,12 +1065,37 @@ document.addEventListener('DOMContentLoaded', () => {
       handleSearch();
     });
 
+    chatsListEl.addEventListener('scroll', hideChatPreviewPopover);
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.chat-preview-popover')) hideChatPreviewPopover();
+    });
+    document.addEventListener('contextmenu', (e) => {
+      if (!e.target.closest('.chat-item')) hideChatPreviewPopover();
+    });
+    window.addEventListener('blur', hideChatPreviewPopover);
+
+    const formatBtnGroup = document.getElementById('format-btn-group');
+    if (formatBtnGroup) {
+      formatBtnGroup.addEventListener('click', (e) => {
+        const btn = e.target.closest('.format-btn');
+        if (!btn) return;
+        applyTextFormat(btn.dataset.format);
+      });
+    }
+
     messageTextInput.addEventListener('input', () => {
       autoResizeTextarea();
       updateSlashAutocomplete();
     });
 
     messageTextInput.addEventListener('keydown', (e) => {
+      const formatShortcut = matchFormatShortcut(e);
+      if (formatShortcut) {
+        e.preventDefault();
+        applyTextFormat(formatShortcut);
+        return;
+      }
+
       const popover = document.getElementById('slash-autocomplete-popover');
       const isPopoverVisible = popover && !popover.classList.contains('hidden');
 
@@ -943,6 +1136,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' || e.key === 'Esc') {
+        hideChatPreviewPopover();
+
         const quickRespModal = document.getElementById('quick-responses-modal');
         if (quickRespModal && !quickRespModal.classList.contains('hidden')) {
           quickRespModal.classList.add('hidden');
@@ -1249,6 +1444,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function escapeHtml(str) {
     return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function avatarPictureTag(pictureUrl) {
+    if (!pictureUrl) return '';
+    return `<img class="avatar-img" src="${escapeHtml(pictureUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`;
   }
 
   function hashCode(str) {
