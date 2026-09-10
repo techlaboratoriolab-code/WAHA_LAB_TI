@@ -54,8 +54,11 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Servir frontend estático
-app.use(express.static(path.join(__dirname, 'public')));
+// Servir frontend estático (sem cache agressivo, para que atualizações de app.js/style.css
+// cheguem no próximo carregamento da página em vez de ficarem presas no cache do navegador)
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
+}));
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -242,6 +245,85 @@ function extractMessagePreview(msg) {
   };
 }
 
+// A WAHA não expõe uma contagem de não lidas por chat, mas o "ack" da última
+// mensagem indica se ELA já foi lida por nós (ack >= 3 / ackName "READ"/"PLAYED").
+// Usamos isso para saber se a última mensagem recebida ainda está pendente de leitura.
+function isMessageUnread(msg) {
+  if (!msg || msg.fromMe === true) return false;
+  if (typeof msg.ack === 'number') return msg.ack < 3;
+  if (typeof msg.ackName === 'string') return !['READ', 'PLAYED'].includes(msg.ackName.toUpperCase());
+  return false;
+}
+
+// Nome de exibição de um contato: prioriza o nome salvo no dispositivo
+// (contact.name); se o número não estiver salvo, usa o nome que a própria
+// pessoa declarou no WhatsApp (contact.pushname). Cacheado em memória para
+// não bater na WAHA a cada poll da lista de chats.
+const contactNameCache = new Map(); // chatId -> { name, pushname, fetchedAt }
+const CONTACT_CACHE_TTL_MS = 10 * 60 * 1000;
+
+async function resolveContactName(chatId) {
+  const cached = contactNameCache.get(chatId);
+  if (cached && (Date.now() - cached.fetchedAt) < CONTACT_CACHE_TTL_MS) {
+    return cached;
+  }
+
+  try {
+    const res = await fetch(`${WAHA_CONFIG.url}/api/contacts?contactId=${encodeURIComponent(chatId)}&session=${WAHA_CONFIG.session}`, {
+      method: 'GET',
+      headers: getWahaHeaders()
+    });
+    if (!res.ok) return cached || { name: '', pushname: '' };
+
+    const contact = await res.json().catch(() => null);
+    const entry = {
+      name: (contact && contact.name) || '',
+      pushname: (contact && contact.pushname) || '',
+      fetchedAt: Date.now()
+    };
+    contactNameCache.set(chatId, entry);
+    return entry;
+  } catch (e) {
+    return cached || { name: '', pushname: '' };
+  }
+}
+
+// Busca as mensagens mais recentes de um chat e retorna, em ordem cronológica,
+// a sequência de mensagens recebidas ainda não lidas (parando na primeira mensagem
+// nossa ou já lida) — assim conseguimos a contagem e o conteúdo reais das
+// mensagens novas, já que a WAHA não expõe isso diretamente por chat.
+async function fetchUnreadMessages(chatId) {
+  try {
+    const encodedId = encodeURIComponent(chatId);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch(`${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats/${encodedId}/messages?limit=50`, {
+      method: 'GET',
+      headers: getWahaHeaders(),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return [];
+    const messages = await res.json().catch(() => []);
+    if (!Array.isArray(messages)) return [];
+
+    const unread = [];
+    for (const msg of messages) {
+      if (!isMessageUnread(msg)) break;
+      unread.push(msg);
+    }
+
+    return unread.reverse().map((msg) => {
+      const { preview, timestamp } = extractMessagePreview(msg);
+      return { preview, timestamp };
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
 // Clients SSE (Server-Sent Events) para Tempo Real no Frontend
 let sseClients = [];
 
@@ -334,7 +416,9 @@ app.get('/api/chats', async (req, res) => {
     const sortBy = req.query.sortBy || 'conversationTimestamp';
     const sortOrder = req.query.sortOrder || 'desc';
 
-    const url = `${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats?limit=${limit}&offset=${offset}&sortBy=${sortBy}&sortOrder=${sortOrder}`;
+    // Usamos o endpoint "overview" da WAHA, que já retorna a última mensagem
+    // (com o ack de leitura) de cada chat em uma única chamada, sem N+1 requests.
+    const url = `${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats/overview?limit=${limit}&offset=${offset}`;
 
     let response;
     try {
@@ -355,55 +439,52 @@ app.get('/api/chats', async (req, res) => {
     const chatsData = await response.json().catch(() => []);
     const chats = Array.isArray(chatsData) ? chatsData : [];
 
-    if (chats.length === 0) {
-      return res.json([]);
+    const enrichedChats = chats.map((chat) => {
+      if (!chat || !chat.id) return chat;
+      const lastMessage = chat.lastMessage;
+      if (lastMessage) {
+        const { preview, fromMe, timestamp } = extractMessagePreview(lastMessage);
+        chat.lastMessagePreview = preview;
+        chat.lastMessageFromMe = fromMe;
+        if (timestamp) chat.lastActivity = timestamp;
+      }
+      chat.unreadCount = isMessageUnread(lastMessage) ? 1 : 0;
+      return chat;
+    });
+
+    // Resolve o nome de exibição de cada contato individual: nome salvo no
+    // dispositivo tem prioridade; se não houver, usa o nome declarado no WhatsApp.
+    const BATCH_SIZE_NAMES = 10;
+    const individualChats = enrichedChats.filter((c) => c && c.id && c.id.endsWith('@c.us'));
+    for (let i = 0; i < individualChats.length; i += BATCH_SIZE_NAMES) {
+      const batch = individualChats.slice(i, i + BATCH_SIZE_NAMES);
+      await Promise.all(batch.map(async (chat) => {
+        const contact = await resolveContactName(chat.id);
+        chat.name = contact.name || contact.pushname || chat.name || '';
+      }));
     }
 
-    // Processamento em lotes de 10 requisições simultâneas para evitar estourar o ngrok
+    // Para os chats com mensagem não lida, buscamos a lista completa de
+    // mensagens ainda não visualizadas (contagem real + conteúdo de cada uma),
+    // em lotes para não sobrecarregar o WAHA.
+    const unreadChats = enrichedChats.filter((c) => c && c.unreadCount > 0);
     const BATCH_SIZE = 10;
-    const enrichedChats = [];
-
-    for (let i = 0; i < chats.length; i += BATCH_SIZE) {
-      const batch = chats.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(batch.map(async (chat) => {
-        if (!chat || !chat.id) return chat;
-        try {
-          if (chat.lastMessage) {
-            const { preview, fromMe, timestamp } = extractMessagePreview(chat.lastMessage);
-            chat.lastMessagePreview = preview;
-            chat.lastMessageFromMe = fromMe;
-            if (timestamp) chat.lastActivity = timestamp;
-            return chat;
-          }
-
-          const encodedId = encodeURIComponent(chat.id);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-          const msgRes = await fetch(`${WAHA_CONFIG.url}/api/${WAHA_CONFIG.session}/chats/${encodedId}/messages?limit=1`, {
-            method: 'GET',
-            headers: getWahaHeaders(),
-            signal: controller.signal
-          }).catch(() => null);
-
-          clearTimeout(timeoutId);
-
-          if (msgRes && msgRes.ok) {
-            const msgs = await msgRes.json().catch(() => []);
-            if (Array.isArray(msgs) && msgs.length > 0) {
-              const { preview, fromMe, timestamp } = extractMessagePreview(msgs[0]);
-              chat.lastMessagePreview = preview;
-              chat.lastMessageFromMe = fromMe;
-              if (timestamp) chat.lastActivity = timestamp;
-            }
-          }
-        } catch (e) {
-          // Ignora falhas individuais em previews
+    for (let i = 0; i < unreadChats.length; i += BATCH_SIZE) {
+      const batch = unreadChats.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(async (chat) => {
+        const unreadMessages = await fetchUnreadMessages(chat.id);
+        if (unreadMessages.length > 0) {
+          chat.unreadCount = unreadMessages.length;
+          chat.unreadMessages = unreadMessages;
         }
-        return chat;
       }));
+    }
 
-      enrichedChats.push(...batchResults);
+    if (sortBy === 'conversationTimestamp') {
+      enrichedChats.sort((a, b) => {
+        const diff = (Number(b.lastActivity || b.conversationTimestamp) || 0) - (Number(a.lastActivity || a.conversationTimestamp) || 0);
+        return sortOrder === 'asc' ? -diff : diff;
+      });
     }
 
     res.json(enrichedChats);
