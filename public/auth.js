@@ -302,6 +302,13 @@
     showAuthOverlay();
   }
 
+  // O token de sessão expira; quando uma rota autenticada devolve 401,
+  // o atendente é deslogado com aviso em vez de ficar num estado "logado" que não funciona.
+  window.flowlabSessaoExpirada = function () {
+    handleLogout();
+    showError('Sua sessão expirou. Faça login novamente para continuar.');
+  };
+
   function setLoading(btn, loading, defaultText) {
     if (!btn) return;
     btn.disabled = loading;

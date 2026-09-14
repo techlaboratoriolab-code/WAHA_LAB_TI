@@ -72,6 +72,22 @@ if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('seu-projeto')) {
 }
 
 // -----------------------------------------------------------------------------
+// AUTENTICAÇÃO DAS ROTAS DO AGENTE E DO APLIS
+// Toda rota sob /api/agent e /api/aplis exige token de sessão válido; a
+// identidade do atendente vem do token, nunca do corpo da requisição.
+// -----------------------------------------------------------------------------
+const { criarRequireAtendente } = require('./lib/auth/requireAtendente');
+const { criarAdaptadoresSupabase } = require('./lib/auth/supabaseAdaptadores');
+const { extrairPermissoes, temAcessoWhatsapp } = require('./lib/auth/permissoes');
+
+const requireAtendente = supabaseServer
+  ? criarRequireAtendente(criarAdaptadoresSupabase(supabaseServer))
+  : (req, res) => res.status(503).json({ error: 'Autenticação não configurada no servidor.' });
+
+app.use('/api/agent', requireAtendente);
+app.use('/api/aplis', requireAtendente);
+
+// -----------------------------------------------------------------------------
 // ENDPOINTS DE AUTENTICAÇÃO FLOW LAB (BACKEND PROXY)
 // -----------------------------------------------------------------------------
 
@@ -116,7 +132,7 @@ app.post('/api/auth/login', async (req, res) => {
       console.error('Erro ao consultar perfil:', profileErr.message);
     }
 
-    let permissions = [];
+    const permissions = extrairPermissoes(profileData);
     let role = 'requester';
     let department = 'Não informado';
     let name = user.user_metadata?.name || email.split('@')[0] || 'Usuário';
@@ -125,15 +141,9 @@ app.post('/api/auth/login', async (req, res) => {
       role = profileData.role || 'requester';
       department = profileData.department || department;
       name = profileData.name || name;
-
-      if (profileData.custom_roles && Array.isArray(profileData.custom_roles.permissions)) {
-        permissions = profileData.custom_roles.permissions;
-      }
     }
 
-    // Avaliação da permissão canUseWhatsapp
-    const isAdmin = role === 'admin' || permissions.includes('*') || permissions.includes('all');
-    const hasWhatsappAccess = isAdmin || permissions.includes('canUseWhatsapp');
+    const hasWhatsappAccess = temAcessoWhatsapp(profileData);
 
     return res.json({
       user: {
@@ -199,13 +209,8 @@ app.post('/api/auth/verify-session', async (req, res) => {
       return res.status(401).json({ authenticated: false });
     }
 
-    let permissions = [];
-    if (profileData.custom_roles && Array.isArray(profileData.custom_roles.permissions)) {
-      permissions = profileData.custom_roles.permissions;
-    }
-
-    const isAdmin = profileData.role === 'admin' || permissions.includes('*') || permissions.includes('all');
-    const hasWhatsappAccess = isAdmin || permissions.includes('canUseWhatsapp');
+    const permissions = extrairPermissoes(profileData);
+    const hasWhatsappAccess = temAcessoWhatsapp(profileData);
 
     return res.json({
       authenticated: true,
@@ -224,7 +229,10 @@ app.post('/api/auth/verify-session', async (req, res) => {
   }
 });
 
-
+// 4. GET /api/agent/eu — Identidade do atendente autenticado, conforme o token
+app.get('/api/agent/eu', (req, res) => {
+  res.json({ atendente: req.atendente });
+});
 
 // Helper para extrair preview legível de mensagem
 function extractMessagePreview(msg) {
