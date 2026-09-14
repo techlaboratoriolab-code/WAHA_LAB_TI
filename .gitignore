@@ -185,3 +185,10 @@ node_modules
 # Environment variables
 .env
 .env.local
+
+# Dado sensível de paciente (relatórios de atendimento) e documentação de fornecedor — nunca versionar
+Docs/
+
+# Configuração local de ferramentas de IA
+.claude/
+.opencode/

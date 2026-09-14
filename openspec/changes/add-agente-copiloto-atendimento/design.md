@@ -1,0 +1,127 @@
+## Context
+
+A aplicação é uma interface tipo WhatsApp Web sobre a API WAHA: Express (`server.js`) como proxy sem estado, front em JS puro (`public/app.js`, ~1950 linhas dentro de um único `DOMContentLoaded`), autenticação via Supabase, deploy na Vercel. Hoje não há persistência de negócio nenhuma — o Supabase é usado apenas para ler perfil no login.
+
+Três restrições da plataforma moldam todo o desenho:
+
+- **Vercel Hobby impõe 10 segundos por função.** Nenhuma rota pode encadear classificação, consulta e renderização numa única chamada.
+- **Não existe processo persistente.** Sem worker, sem fila, sem `setTimeout` que sobreviva à resposta. O navegador é o relógio do sistema.
+- **SSE não é confiável em serverless.** O caminho real de atualização já é o polling de 4 segundos em `startSmartPollingSync()`; nada aqui deve depender de SSE.
+
+Duas restrições de segurança herdadas importam: **nenhuma rota é autenticada hoje**, e a credencial do apLIS autoriza tanto leitura quanto escrita de requisições de pacientes.
+
+Os números que justificam prioridade vêm de 4.074 atendimentos reais analisados: ~41% do volume é consulta de leitura, "laudo" isolado é 21,5%, e pendência sem resposta aparece em 52 dos 62 dias.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Entregar a informação do apLIS dentro do chat, sem o atendente trocar de sistema
+- Sinalizar conversas esquecidas sem interromper quem está trabalhando
+- Construir um motor onde processo novo é configuração, não código de integração
+- Fechar o furo de autenticação antes de expor qualquer dado de paciente
+- Manter o sistema funcionando exatamente como hoje quando o agente estiver desligado
+
+**Non-Goals:**
+- Dashboard de avaliação por atendente (exige acúmulo entre dias, portanto banco)
+- OCR de documentos enviados pelo paciente
+- Chat tira-dúvidas para o atendente
+- Redação de texto por modelo de linguagem
+- Envio automático de qualquer mensagem ou anexo ao paciente
+- Escrita no apLIS, em qualquer hipótese
+
+## Decisions
+
+### Consulta pela API do apLIS, não pelo espelho MySQL
+
+Havia a opção de consultar um banco espelho do apLIS com atraso de 1 dia, acessível externamente com usuário de privilégio total. Um teste contra `requisicaoListar` com a credencial de integração mostrou que ela é de **usuário interno** — o nível que aceita busca por `nomPaciente` ("Nome ou CPF") e devolve `CodRequisicao`, `NomPaciente`, `CPF`, `NomExame`, `DtaPrevista`, `DesEvento` e `StatusExame` em uma chamada, sem atraso.
+
+O espelho perde nos três eixos: introduz janela de 1 dia em que o sistema responde "não encontrei" para quem coletou ontem — justamente a intenção mais frequente —, expõe a base de pacientes fora da rede com superusuário, e ainda assim exige a API depois para status e laudo. **Decisão: usar apenas a API.** O banco volta à discussão se aparecer consulta agregada que a API não cubra, aí com usuário restrito a `SELECT`.
+
+### Lista branca de comandos, em vez de política de não escrever
+
+"Não escrever no apLIS" como regra escrita depende de todo mundo lembrar. O `aplisClient` aceita apenas seis comandos de leitura e rejeita qualquer outro antes de montar a requisição. `admissaoSalvar` e `requisicaoCancelar` não são proibidos — são inconstruíveis. Isso também protege contra injeção via mensagem de paciente, já que o texto do paciente nunca vira nome de comando.
+
+### Ciclo de vida único com escotilha por etapa
+
+A alternativa natural — declarativo para processo simples e código para processo complexo — cria dois sistemas paralelos: ninguém sabe qual usar no processo seguinte, e as garantias valem num caminho e não no outro.
+
+Aqui existe um motor só. Todo processo passa por detectar → buscar → renderizar → avisar, e **cada etapa** aceita declaração ou função. Um processo pode ter busca em código e renderização declarativa. As garantias — lista branca, confirmação, cache, teto de consumo — vivem no motor, então um processo escrito em função também não consegue contornar a confirmação nem alcançar as credenciais, porque ele pede a consulta ao motor em vez de falar com o apLIS.
+
+Critério de uso: uma chamada mais mapeamento de campos é declaração; condicional, encadeamento ou manipulação de arquivo é função. Os três processos iniciais devem sair 100% declarativos — se `previsao_entrega` precisar de código, o motor está errado e conserta-se antes de acumular processo em cima.
+
+### Análise na abertura da conversa, com cache por última mensagem
+
+Analisar a cada mensagem recebida geraria milhares de chamadas por dia e recalcularia enquanto o paciente ainda digita. Analisar na abertura entrega a informação no momento em que o atendente vai agir, reduz o volume em uma ordem de grandeza e resolve sozinho o paciente que manda seis mensagens seguidas — a análise roda uma vez, sobre as 30.
+
+O cache é indexado por `chatId` + id da última mensagem, no navegador. Reabrir conversa sem mensagem nova é instantâneo e gratuito; mensagem nova muda a chave e recalcula. Alternar entre conversas, que é o comportamento real do atendente, deixa de custar.
+
+### Intenção como lista fechada, com campo de descoberta
+
+Texto livre de intenção não é acionável: cada dia inventa um rótulo diferente e nada consegue escolher template ou medir. A saída usa JSON Schema com enum de quatro valores — três atendidos mais `outro`.
+
+O `outro` carrega texto livre descritivo e vai para log estruturado no servidor, sem `chatId`, CPF ou nome. Ao fim do piloto, o ranking dos `outro` é a lista priorizada do que mapear em seguida — que é exatamente a dúvida em aberto sobre quais processos o atendimento executa.
+
+### Gemini 3.5 Flash-Lite com limiar de confiança
+
+A tarefa é classificação com enum de quatro valores mais extração de campos, não redação. No volume estimado (~255 chamadas/dia com o cache), o custo fica em torno de US$ 7/mês, contra ~US$ 31 do Flash.
+
+O modelo mais barato erra mais, e o modo de falha importa: intenção errada exibida com confiança faz o atendente parar de olhar para o painel, e o projeto morre por desuso. Por isso o limiar de confiança é parte do desenho, não refinamento — abaixo dele o painel diz que não identificou. Errar em silêncio é recuperável. O piloto mede a taxa real e a troca de modelo é uma variável de configuração.
+
+### Identidade do atendente pelo servidor, prefixo como reserva
+
+O front hoje prefixa toda mensagem enviada com `Nome Sobrenome:`. Isso é útil, mas frágil: a base atual tem 13 identidades para 12 pessoas — um mesmo atendente aparece em até três grafias, e outro ora com sobrenome ora sem. Casar atendente por string misturaria gente numa métrica que avalia pessoas.
+
+A fonte primária passa a ser o token validado no servidor. O prefixo fica como fonte secundária, para mensagem enviada por fora do sistema. Sem nenhuma das duas, a mensagem é marcada como não atribuída — nunca chutada.
+
+### Autenticação na primeira fase, não na última
+
+O plano inicial deixava autenticação para o endurecimento final. Isso significaria uma janela em que `/api/aplis/consultar` responde consulta de paciente para qualquer um que descubra a URL. Como `/api/auth/login` já devolve `session.accessToken`, validar esse token no servidor resolve autenticação e identidade do atendente de uma vez, com pouco código.
+
+### Notificação em três canais, sem modal
+
+Pop-up modal a cada 8 minutos, com ~85 conversas ativas por dia, interromperia o atendente no meio da digitação. O desenho usa contador permanente no rail, painel com a lista filtrada, e aviso temporário agregado com intervalo mínimo de 5 minutos — o padrão de WhatsApp Web e Slack, que não exige treinamento. Modal fica reservado para o caso crítico acima de 3 horas, se o time quiser depois.
+
+### Relógio de pendência limitado ao expediente
+
+Sem isso, toda segunda-feira nasce com dezenas de pendências de 60 horas vindas do fim de semana, e o contador perde o sentido logo no primeiro dia de uso.
+
+### Laudo pronto avisa e aponta para o portal
+
+`requisicaoLaudo` devolve o PDF em base64 e o sistema já sabe enviar arquivo — tecnicamente daria para anexar sozinho. Isso faria o agente despachar resultado clínico para um número de WhatsApp com base em identificação digitada no chat. Se o número for de um familiar, ou o CPF estiver errado, o vazamento não tem volta. O fluxo mantém o que o laboratório já faz: avisa que está pronto e aponta para o portal, onde o paciente entra com as credenciais dele.
+
+## Risks / Trade-offs
+
+**Classificação errada de intenção com modelo econômico** → Limiar de confiança exibe indefinição em vez de intenção errada; piloto de duas semanas mede a taxa real; troca de modelo é configuração.
+
+**Homônimo na busca por nome** → Múltiplos pacientes distintos forçam escolha explícita do atendente, sem sugestão montada antes da seleção. É a barreira que evita repetir o incidente de privacidade já registrado nos relatórios.
+
+**Teto de 10s da Vercel** → Uma etapa por requisição, `AbortController` em 8s, e falha degrada para "sem sugestão" — nunca bloqueia o envio de mensagem.
+
+**Sugestão errada chegar ao paciente** → Nenhum envio automático. O painel apenas preenche o campo, e todo dado exibido mostra o código da requisição para conferência.
+
+**Custo fora de controle em dia atípico** → Cache por conversa, teto diário por atendente, habilitação por lista de atendentes, e desligamento global.
+
+**Ausência de trilha de auditoria de acesso a paciente** → Consequência aceita da decisão de não usar banco. Mitigação parcial: log estruturado no servidor com atendente e código de requisição, sem dado identificável. Resolve-se de fato quando a fase do dashboard introduzir persistência.
+
+**Regressão na interface existente** → Com o agente desligado, o comportamento deve ser idêntico ao atual; isso é requisito verificável, não expectativa.
+
+**Credenciais expostas durante o planejamento** → As credenciais do apLIS e do banco espelho circularam fora de cofre e devem ser rotacionadas antes do início da implementação. O acesso externo ao banco espelho deve ser desativado, já que a decisão de usar a API tornou o espelho desnecessário.
+
+## Migration Plan
+
+1. **Pré-requisitos operacionais** — rotacionar credenciais do apLIS, desativar o túnel do MySQL, solicitar à Lacuna credencial de integração somente leitura, confirmar conta Gemini em tier pago.
+2. **Autenticação primeiro** — middleware de validação de token nas rotas novas, antes de qualquer rota que exponha dado de paciente.
+3. **Consulta manual** — `aplisClient` e rota de consulta, acionados por código digitado, sem modelo envolvido. Valida credencial, rede e normalização isoladamente.
+4. **Motor e catálogo** — ciclo de vida e os três processos declarativos.
+5. **Classificação de intenção** — integração com o modelo, cache e limiar.
+6. **Pendências** — cálculo no cliente e os três canais de notificação.
+7. **Piloto** — dois atendentes, um de alto e um de baixo volume, por duas semanas.
+
+**Rollback:** desligar o agente pela configuração global restaura o comportamento atual sem redeploy. Como não há migração de dados nem escrita em sistema externo, não existe estado a reverter.
+
+## Open Questions
+
+- Qual o horário de expediente a configurar, e se há diferença entre dias da semana e sábado.
+- Qual o limiar de confiança inicial — sugerido começar conservador e calibrar com os dados do piloto.
+- Quais contatos entram previamente marcados como clínica parceira em `parceiros.js`.
+- Se o teto diário de chamadas por atendente deve ser uniforme, dado que o volume por pessoa varia de ~2 a ~28 conversas por dia.
