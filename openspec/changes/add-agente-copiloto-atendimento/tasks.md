@@ -9,11 +9,11 @@
 
 ## 2. Autenticação das rotas
 
-- [ ] 2.1 Criar middleware que valida o token de sessão do Supabase no servidor e anexa o perfil do atendente à requisição
-- [ ] 2.2 Responder 401 sem token válido e 403 para perfil sem permissão de WhatsApp
-- [ ] 2.3 Fazer o front enviar o `accessToken` guardado no login em todas as chamadas às rotas novas
-- [ ] 2.4 Aplicar o middleware em todas as rotas `/api/agent/*` e `/api/aplis/*`
-- [ ] 2.5 Verificar que requisição sem token não alcança apLIS nem modelo
+- [x] 2.1 Criar middleware que valida o token de sessão do Supabase no servidor e anexa o perfil do atendente à requisição
+- [x] 2.2 Responder 401 sem token válido e 403 para perfil sem permissão de WhatsApp
+- [x] 2.3 Fazer o front enviar o `accessToken` guardado no login em todas as chamadas às rotas novas
+- [x] 2.4 Aplicar o middleware em todas as rotas `/api/agent/*` e `/api/aplis/*`
+- [x] 2.5 Verificar que requisição sem token não alcança apLIS nem modelo
 
 ## 3. Cliente do apLIS (somente leitura)
 
