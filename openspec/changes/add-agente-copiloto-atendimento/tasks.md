@@ -17,20 +17,20 @@
 
 ## 3. Cliente do apLIS (somente leitura)
 
-- [ ] 3.1 Criar `lib/aplisClient.js` com o envelope `{ver, cmd, dat}` e autenticação básica
-- [ ] 3.2 Implementar a lista branca de comandos de leitura e rejeitar qualquer outro antes da requisição HTTP
-- [ ] 3.3 Tratar `sucesso: 0` como erro de negócio, expondo `codErro` e `msgErro` de forma legível
-- [ ] 3.4 Aplicar `AbortController` com corte em 8 segundos
-- [ ] 3.5 Normalizar o retorno de `requisicaoListar` para um formato interno estável
-- [ ] 3.6 Normalizar o retorno de `requisicaoStatus`, priorizando `descricaoCliente` sobre a descrição interna
-- [ ] 3.7 Escrever teste que confirme que comando de escrita é recusado sem contatar o apLIS
+- [x] 3.1 Criar `lib/aplis/client.js` com o envelope `{ver, cmd, dat}` e autenticação básica
+- [x] 3.2 Implementar a lista branca de comandos de leitura e rejeitar qualquer outro antes da requisição HTTP
+- [x] 3.3 Tratar `sucesso: 0` como erro de negócio, expondo `codErro` e `msgErro` de forma legível
+- [x] 3.4 Aplicar `AbortController` com corte em 8 segundos
+- [x] 3.5 Normalizar o retorno de `requisicaoListar` para um formato interno estável
+- [x] 3.6 Normalizar o retorno de `requisicaoStatus`, priorizando `descricaoCliente` sobre a descrição interna
+- [x] 3.7 Escrever teste que confirme que comando de escrita é recusado sem contatar o apLIS
 
 ## 4. Rota de consulta
 
-- [ ] 4.1 Criar `POST /api/aplis/consultar` aceitando código de requisição, CPF ou nome
-- [ ] 4.2 Implementar janela padrão de 90 dias e o parâmetro de ampliação para 24 meses
+- [x] 4.1 Criar `POST /api/aplis/consultar` aceitando código de requisição (CPF e nome entram na tarefa 4.2)
+- [ ] 4.2 Implementar busca por CPF/nome, janela padrão de 90 dias e o parâmetro de ampliação para 24 meses
 - [ ] 4.3 Agrupar o resultado por paciente distinto e sinalizar quando houver mais de um
-- [ ] 4.4 Registrar em log apenas código de requisição, atendente e horário
+- [x] 4.4 Registrar em log apenas código de requisição, atendente e horário
 - [ ] 4.5 Configurar `functions.maxDuration` no `vercel.json`
 
 ## 5. Motor de processos
@@ -71,14 +71,14 @@
 
 ## 9. Painel do agente
 
-- [ ] 9.1 Criar o painel acima do campo de digitação, seguindo o padrão do `#reply-preview-bar`
-- [ ] 9.2 Renderizar o cartão de dados incluindo o código da requisição
+- [x] 9.1 Criar o painel acima do campo de digitação, seguindo o padrão do `#reply-preview-bar`
+- [x] 9.2 Renderizar o cartão de dados incluindo o código da requisição
 - [ ] 9.3 Implementar a ação "Inserir", que apenas preenche o campo e devolve o foco
 - [ ] 9.4 Implementar a lista de escolha quando houver mais de um paciente, sem sugestão antes da seleção
 - [ ] 9.5 Implementar o estado de intenção sem identificador, com resposta pedindo CPF e campo de digitação manual
 - [ ] 9.6 Implementar os três níveis de aviso por cor, com os tokens de tema existentes
 - [ ] 9.7 Criar `public/parceiros.js` e aplicar a marcação clínica/paciente
-- [ ] 9.8 Manter o painel oculto quando não houver intenção nem aviso
+- [x] 9.8 Manter o painel oculto quando não houver intenção nem aviso
 
 ## 10. Pendências
 

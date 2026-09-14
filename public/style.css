@@ -1161,6 +1161,189 @@ body {
   color: var(--text-main);
 }
 
+/* ---------------------------------------------------------------------
+   PAINEL DO AGENTE (acima do campo de digitação)
+--------------------------------------------------------------------- */
+.agent-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-card-item);
+  border: 1px solid var(--border-app-strong);
+  border-radius: var(--r-xl);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  animation: slide-up 150ms var(--ease-out);
+  position: relative;
+  z-index: 5;
+}
+
+.agent-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--blue-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agent-consulta {
+  display: flex;
+  gap: 6px;
+}
+
+.agent-consulta-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-input-field);
+  border: 1px solid var(--border-app);
+  border-radius: var(--r-lg);
+  color: var(--text-main);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-smooth);
+}
+
+.agent-consulta-input:focus {
+  border-color: var(--blue-500);
+}
+
+.agent-consulta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--r-lg);
+  background: var(--blue-500);
+  border: none;
+  color: #ffffff;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-smooth);
+}
+
+.agent-consulta-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: var(--shadow-blue-glow);
+}
+
+.agent-consulta-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.agent-panel-body:empty {
+  display: none;
+}
+
+.agent-estado {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-sub);
+  padding: 4px 2px;
+}
+
+.agent-estado-erro {
+  color: var(--danger-500);
+}
+
+.agent-estado-detalhe {
+  font-size: var(--text-xs);
+  color: var(--text-muted-custom);
+  margin-top: 2px;
+}
+
+.agent-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-input-field);
+  border: 1px solid var(--border-app);
+  border-radius: var(--r-lg);
+  padding: 10px 12px;
+}
+
+.agent-cartao-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-cartao-codigo {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.03em;
+}
+
+.agent-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue-500);
+}
+
+.agent-chip-concluido {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.agent-chip-cancelado {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger-500);
+}
+
+.agent-cartao-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 4px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.agent-cartao-grid dt {
+  color: var(--text-muted-custom);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  align-self: baseline;
+}
+
+.agent-cartao-grid dd {
+  margin: 0;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.agent-cartao-origem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-muted-custom);
+}
+
 .msg-text {
   white-space: pre-wrap;
   word-break: break-word;

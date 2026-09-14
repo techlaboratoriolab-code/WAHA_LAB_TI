@@ -205,6 +205,24 @@
               </button>
             </div>
 
+            <!-- PAINEL DO AGENTE (CONSULTA AO APLIS) -->
+            <div class="agent-panel hidden" id="agent-panel">
+              <div class="agent-panel-header">
+                <span class="agent-panel-title"><i class="ph-bold ph-robot"></i> Agente</span>
+                <button type="button" class="reply-preview-close" id="agent-panel-close" title="Fechar painel">
+                  <i class="ph-bold ph-x"></i>
+                </button>
+              </div>
+              <form class="agent-consulta" id="agent-consulta-form" autocomplete="off">
+                <input type="text" id="agent-consulta-input" class="agent-consulta-input"
+                  placeholder="Código da requisição (13 dígitos)" inputmode="numeric" maxlength="13">
+                <button type="submit" class="agent-consulta-btn" id="agent-consulta-btn">
+                  <i class="ph-bold ph-magnifying-glass"></i> Consultar
+                </button>
+              </form>
+              <div class="agent-panel-body" id="agent-panel-body"></div>
+            </div>
+
             <div class="message-input-wrapper">
               <textarea id="message-text-input" placeholder="Enviar mensagem... (Digite / para respostas rápidas)" rows="1"></textarea>
             </div>
@@ -222,6 +240,11 @@
                   </button>
                   <button type="button" class="format-btn" data-format="code" title="Código monoespaçado (Ctrl+Shift+M) — ```texto```">
                     <i class="ph-bold ph-code"></i>
+                  </button>
+                </div>
+                <div class="format-btn-group">
+                  <button type="button" class="format-btn" id="agent-toggle-btn" title="Agente — consultar requisição no apLIS">
+                    <i class="ph-bold ph-robot"></i>
                   </button>
                 </div>
                 <button class="attach-btn-styled" id="attach-btn" title="Anexar arquivo / PDF">
@@ -505,6 +528,7 @@
 
   <script src="quick_responses.js"></script>
   <script src="agent_api.js"></script>
+  <script src="agent_panel.js"></script>
   <script src="app.js"></script>
   <script src="auth.js"></script>
 </body>

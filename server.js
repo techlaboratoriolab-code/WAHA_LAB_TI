@@ -88,6 +88,40 @@ app.use('/api/agent', requireAtendente);
 app.use('/api/aplis', requireAtendente);
 
 // -----------------------------------------------------------------------------
+// INTEGRAÇÃO SOMENTE LEITURA COM O APLIS
+// -----------------------------------------------------------------------------
+const { criarAplisClient, AplisError } = require('./lib/aplis/client');
+const { consultarPorCodigo } = require('./lib/aplis/consultas');
+
+const aplisClient = (process.env.APLIS_BASE_URL && process.env.APLIS_USUARIO && process.env.APLIS_SENHA)
+  ? criarAplisClient({
+      baseUrl: process.env.APLIS_BASE_URL.trim(),
+      usuario: process.env.APLIS_USUARIO.trim(),
+      senha: process.env.APLIS_SENHA.trim(),
+      timeoutMs: 8000
+    })
+  : null;
+
+const STATUS_HTTP_POR_TIPO_APLIS = {
+  entrada_invalida: 400,
+  negocio: 422,
+  timeout: 504,
+  rede: 502,
+  http: 502,
+  resposta_invalida: 502,
+  comando_nao_permitido: 500
+};
+
+function responderErroAplis(res, err) {
+  if (err instanceof AplisError) {
+    const status = STATUS_HTTP_POR_TIPO_APLIS[err.tipo] || 500;
+    return res.status(status).json({ error: err.message, tipo: err.tipo, codErro: err.codErro });
+  }
+  console.error('[aplis] erro inesperado:', err && err.message);
+  return res.status(500).json({ error: 'Erro interno ao consultar o apLIS.', tipo: 'interno' });
+}
+
+// -----------------------------------------------------------------------------
 // ENDPOINTS DE AUTENTICAÇÃO FLOW LAB (BACKEND PROXY)
 // -----------------------------------------------------------------------------
 
@@ -232,6 +266,22 @@ app.post('/api/auth/verify-session', async (req, res) => {
 // 4. GET /api/agent/eu — Identidade do atendente autenticado, conforme o token
 app.get('/api/agent/eu', (req, res) => {
   res.json({ atendente: req.atendente });
+});
+
+// 5. POST /api/aplis/consultar — Consulta de requisição no apLIS (somente leitura)
+app.post('/api/aplis/consultar', async (req, res) => {
+  if (!aplisClient) {
+    return res.status(503).json({ error: 'Integração com o apLIS não configurada no servidor.', tipo: 'nao_configurado' });
+  }
+  const { codRequisicao } = req.body || {};
+  try {
+    const resultado = await consultarPorCodigo(aplisClient, codRequisicao);
+    // Só o necessário para rastrear: nunca nome, CPF ou telefone.
+    console.log(`[aplis] consulta codRequisicao=${resultado.codRequisicao || (resultado.requisicao && resultado.requisicao.codRequisicao)} atendente=${req.atendente.id} encontrado=${resultado.encontrado} em=${new Date().toISOString()}`);
+    return res.json(resultado);
+  } catch (err) {
+    return responderErroAplis(res, err);
+  }
 });
 
 // Helper para extrair preview legível de mensagem
