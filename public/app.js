@@ -958,8 +958,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function sendMessage() {
     if (!activeChat || isSendingMessage) return;
 
-    const text = messageTextInput.value.trim();
-    if (!text && !selectedFile) return;
+    const rawText = messageTextInput.value.trim();
+    if (!rawText && !selectedFile) return;
+
+    // Identifica quem está respondendo, já que várias pessoas atendem pelo mesmo número.
+    const text = rawText ? `${getStaffDisplayName()}:\n${rawText}` : rawText;
 
     isSendingMessage = true;
     sendMsgBtn.disabled = true;
@@ -992,7 +995,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (res.ok && data.success) {
           const fileNameStr = fileToSend.name;
-          activeChat.lastMessagePreview = text ? `📄 ${fileNameStr}: ${text}` : `📄 ${fileNameStr}`;
+          activeChat.lastMessagePreview = rawText ? `📄 ${fileNameStr}: ${rawText}` : `📄 ${fileNameStr}`;
           activeChat.lastMessageFromMe = true;
           activeChat.lastActivity = Math.floor(Date.now() / 1000);
 
@@ -1024,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
 
         if (res.ok && data.success) {
-          activeChat.lastMessagePreview = text;
+          activeChat.lastMessagePreview = rawText;
           activeChat.lastMessageFromMe = true;
           activeChat.lastActivity = Math.floor(Date.now() / 1000);
 
@@ -1424,6 +1427,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
+  function getFirstAndLastName(fullName) {
+    if (!fullName) return '';
+    const clean = fullName.replace(/WhatsApp Lab TI/i, '').trim();
+    const parts = clean.split(/\s+/).filter(p => p.length > 0);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[parts.length - 1]}`;
+  }
+
+  function getStaffDisplayName() {
+    const rawStaffName = (window.currentUser && window.currentUser.name) || document.getElementById('auth-user-name')?.textContent || '';
+    return getFirstAndLastName(rawStaffName) || 'Atendente';
+  }
+
   function formatPhoneNumber(phone) {
     const clean = phone.replace(/[^0-9]/g, '');
     if (clean.length === 13 && clean.startsWith('55')) {
@@ -1726,17 +1743,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-preenchimento inteligente de variáveis conhecidas
     const defaultPatientName = (activeChat && activeChat.name) ? activeChat.name : '';
 
-    function getFirstAndLastName(fullName) {
-      if (!fullName) return '';
-      const clean = fullName.replace(/WhatsApp Lab TI/i, '').trim();
-      const parts = clean.split(/\s+/).filter(p => p.length > 0);
-      if (parts.length === 0) return '';
-      if (parts.length === 1) return parts[0];
-      return `${parts[0]} ${parts[parts.length - 1]}`;
-    }
-
-    const rawStaffName = (window.currentUser && window.currentUser.name) || document.getElementById('auth-user-name')?.textContent || '';
-    const defaultStaffName = getFirstAndLastName(rawStaffName) || 'Atendente';
+    const defaultStaffName = getStaffDisplayName();
 
     placeholders.forEach((ph, idx) => {
       const group = document.createElement('div');
