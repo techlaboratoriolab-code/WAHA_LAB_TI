@@ -91,7 +91,7 @@ app.use('/api/aplis', requireAtendente);
 // INTEGRAÇÃO SOMENTE LEITURA COM O APLIS
 // -----------------------------------------------------------------------------
 const { criarAplisClient, AplisError } = require('./lib/aplis/client');
-const { consultarPorCodigo } = require('./lib/aplis/consultas');
+const { consultarPorCodigo, buscarPorPaciente, classificarTermo } = require('./lib/aplis/consultas');
 
 const aplisClient = (process.env.APLIS_BASE_URL && process.env.APLIS_USUARIO && process.env.APLIS_SENHA)
   ? criarAplisClient({
@@ -268,17 +268,32 @@ app.get('/api/agent/eu', (req, res) => {
   res.json({ atendente: req.atendente });
 });
 
-// 5. POST /api/aplis/consultar — Consulta de requisição no apLIS (somente leitura)
+// 5. POST /api/aplis/consultar — Consulta no apLIS (somente leitura)
+// Body: { termo, ampliar? }. O termo pode ser código de requisição (13 dígitos),
+// CPF ou nome; a resposta indica o tipo reconhecido.
 app.post('/api/aplis/consultar', async (req, res) => {
   if (!aplisClient) {
     return res.status(503).json({ error: 'Integração com o apLIS não configurada no servidor.', tipo: 'nao_configurado' });
   }
-  const { codRequisicao } = req.body || {};
+  const { termo, ampliar } = req.body || {};
+  const classificado = classificarTermo(termo);
+  if (!classificado) {
+    return res.status(400).json({ error: 'Informe um código de requisição, CPF ou nome com pelo menos 3 caracteres.', tipo: 'entrada_invalida' });
+  }
+
   try {
-    const resultado = await consultarPorCodigo(aplisClient, codRequisicao);
-    // Só o necessário para rastrear: nunca nome, CPF ou telefone.
-    console.log(`[aplis] consulta codRequisicao=${resultado.codRequisicao || (resultado.requisicao && resultado.requisicao.codRequisicao)} atendente=${req.atendente.id} encontrado=${resultado.encontrado} em=${new Date().toISOString()}`);
-    return res.json(resultado);
+    let resultado;
+    let rastro;
+    if (classificado.tipo === 'codigo') {
+      resultado = await consultarPorCodigo(aplisClient, classificado.valor);
+      rastro = `codRequisicao=${classificado.valor}`;
+    } else {
+      resultado = await buscarPorPaciente(aplisClient, classificado.valor, { ampliar: ampliar === true });
+      // Nunca o termo em si: seria nome ou CPF de paciente no log.
+      rastro = `tipo=${classificado.tipo} pacientes=${resultado.pacientes.length} janelaDias=${resultado.janelaDias}`;
+    }
+    console.log(`[aplis] consulta ${rastro} atendente=${req.atendente.id} encontrado=${resultado.encontrado} em=${new Date().toISOString()}`);
+    return res.json({ tipo: classificado.tipo, ...resultado });
   } catch (err) {
     return responderErroAplis(res, err);
   }

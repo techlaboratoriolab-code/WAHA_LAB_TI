@@ -28,8 +28,8 @@
 ## 4. Rota de consulta
 
 - [x] 4.1 Criar `POST /api/aplis/consultar` aceitando código de requisição (CPF e nome entram na tarefa 4.2)
-- [ ] 4.2 Implementar busca por CPF/nome, janela padrão de 90 dias e o parâmetro de ampliação para 24 meses
-- [ ] 4.3 Agrupar o resultado por paciente distinto e sinalizar quando houver mais de um
+- [x] 4.2 Implementar busca por CPF/nome, janela padrão de 90 dias e o parâmetro de ampliação para 24 meses
+- [x] 4.3 Agrupar o resultado por paciente distinto e sinalizar quando houver mais de um
 - [x] 4.4 Registrar em log apenas código de requisição, atendente e horário
 - [ ] 4.5 Configurar `functions.maxDuration` no `vercel.json`
 
@@ -74,7 +74,7 @@
 - [x] 9.1 Criar o painel acima do campo de digitação, seguindo o padrão do `#reply-preview-bar`
 - [x] 9.2 Renderizar o cartão de dados incluindo o código da requisição
 - [ ] 9.3 Implementar a ação "Inserir", que apenas preenche o campo e devolve o foco
-- [ ] 9.4 Implementar a lista de escolha quando houver mais de um paciente, sem sugestão antes da seleção
+- [x] 9.4 Implementar a lista de escolha quando houver mais de um paciente, sem sugestão antes da seleção
 - [ ] 9.5 Implementar o estado de intenção sem identificador, com resposta pedindo CPF e campo de digitação manual
 - [ ] 9.6 Implementar os três níveis de aviso por cor, com os tokens de tema existentes
 - [ ] 9.7 Criar `public/parceiros.js` e aplicar a marcação clínica/paciente
