@@ -10,6 +10,12 @@
   let geracao = 0;
   // Resultado da última busca por paciente, para navegar entre requisições sem nova chamada.
   let pacientesDaBusca = [];
+  // Quando a busca partiu de uma intenção detectada (#5), guarda qual — para
+  // destacar só a resposta correspondente em vez das três possíveis.
+  let somenteIntencaoAtual = null;
+  // 'deteccao' | 'manual' | null — uma detecção nova pode substituir outra
+  // detecção, mas nunca uma busca manual que o atendente já iniciou.
+  let origemConteudoAtual = null;
 
   function escapeHtml(str) {
     return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -30,6 +36,8 @@
   function reset() {
     geracao++;
     pacientesDaBusca = [];
+    somenteIntencaoAtual = null;
+    origemConteudoAtual = null;
     body.innerHTML = '';
     input.value = '';
     btn.disabled = false;
@@ -67,6 +75,8 @@
     if (ampliarBtn) ampliarBtn.addEventListener('click', () => consultar(termo, { ampliar: true }));
   }
 
+  const LABEL_PROCESSO = { previsao_entrega: 'Previsão de entrega', status_exame: 'Status do exame', laudo_disponivel: 'Laudo / portal' };
+
   function cartaoHtml(r) {
     const status = r.statusCliente || r.status || '—';
     return `
@@ -86,17 +96,53 @@
       </div>`;
   }
 
-  function renderCartao(r) {
-    body.innerHTML = cartaoHtml(r);
+  // Filtra uma vez só; o resultado alimenta tanto o HTML quanto os botões, para
+  // o índice data-sugestao nunca poder desalinhar do array que os liga.
+  function filtrarSugestoes(sugestoes, somenteIntencao) {
+    return somenteIntencao ? sugestoes.filter((s) => s.intencao === somenteIntencao) : sugestoes;
+  }
+
+  // Respostas prontas calculadas pelo servidor a partir da mesma situação do
+  // cartão. "Inserir" só preenche o campo — nunca envia.
+  function sugestoesHtml(lista) {
+    if (!lista.length) return '';
+    return `
+      <div class="agent-lista-titulo">Respostas prontas</div>
+      <div class="agent-sugestoes">
+        ${lista.map((s, i) => `
+          <div class="agent-sugestao">
+            <div class="agent-sugestao-cabecalho">
+              <span class="agent-sugestao-rotulo">${escapeHtml(LABEL_PROCESSO[s.processoId] || s.processoId)}</span>
+              <button type="button" class="agent-btn-inserir" data-sugestao="${i}"><i class="ph-bold ph-arrow-bend-up-left"></i> Inserir</button>
+            </div>
+            <p class="agent-sugestao-texto">${escapeHtml(s.texto)}</p>
+          </div>`).join('')}
+      </div>`;
+    }
+
+  function ligarBotoesInserir(container, sugestoes) {
+    container.querySelectorAll('.agent-btn-inserir').forEach((el) => {
+      el.addEventListener('click', () => {
+        const s = sugestoes[Number(el.dataset.sugestao)];
+        if (s && window.inserirNoCampoDeMensagem) window.inserirNoCampoDeMensagem(s.texto);
+      });
+    });
+  }
+
+  function renderCartao(r, opts = {}) {
+    const sugestoesFiltradas = filtrarSugestoes(r.sugestoes || [], opts.somenteIntencao);
+    body.innerHTML = cartaoHtml(r) + sugestoesHtml(sugestoesFiltradas);
+    ligarBotoesInserir(body, sugestoesFiltradas);
   }
 
   // Um único paciente: cartão da requisição em foco + as demais dele, navegáveis sem nova chamada.
-  function renderPaciente(paciente, indiceEmFoco = 0) {
+  function renderPaciente(paciente, indiceEmFoco = 0, opts = {}) {
     const emFoco = paciente.requisicoes[indiceEmFoco];
     const outras = paciente.requisicoes
       .map((r, i) => ({ r, i }))
       .filter(({ i }) => i !== indiceEmFoco);
-    body.innerHTML = cartaoHtml(emFoco) + (outras.length ? `
+    const sugestoesFiltradas = filtrarSugestoes(emFoco.sugestoes || [], opts.somenteIntencao);
+    body.innerHTML = cartaoHtml(emFoco) + sugestoesHtml(sugestoesFiltradas) + (outras.length ? `
       <div class="agent-lista-titulo">Outras requisições deste paciente</div>
       <ul class="agent-lista">
         ${outras.map(({ r, i }) => `
@@ -105,8 +151,9 @@
             <span class="agent-lista-secundario">${escapeHtml(r.dtaSolicitacao || '')} · ${escapeHtml(SITUACAO_LABEL[r.situacao] || '')}</span>
           </button></li>`).join('')}
       </ul>` : '');
+    ligarBotoesInserir(body, sugestoesFiltradas);
     body.querySelectorAll('.agent-lista-item').forEach((el) => {
-      el.addEventListener('click', () => renderPaciente(paciente, Number(el.dataset.indice)));
+      el.addEventListener('click', () => renderPaciente(paciente, Number(el.dataset.indice), opts));
     });
   }
 
@@ -148,7 +195,7 @@
       // Sem status ao cliente, o cartão usa o status interno.
     }
     if (minhaGeracao !== geracao) return;
-    renderPaciente(paciente, 0);
+    renderPaciente(paciente, 0, { somenteIntencao: somenteIntencaoAtual });
   }
 
   // ---------------------------------------------------------------------------
@@ -176,12 +223,14 @@
     return data;
   }
 
-  async function consultar(termo, { ampliar = false } = {}) {
+  async function consultar(termo, { ampliar = false, somenteIntencao = null } = {}) {
     const limpo = String(termo || '').trim();
     if (limpo.length < 3) {
       renderErro('Informe um código de requisição, CPF ou nome com pelo menos 3 caracteres.');
       return;
     }
+    somenteIntencaoAtual = somenteIntencao;
+    origemConteudoAtual = 'manual';
     const minhaGeracao = ++geracao;
     btn.disabled = true;
     renderCarregando(ampliar ? `Buscando ${limpo} nos últimos 24 meses…` : `Consultando ${limpo}…`);
@@ -195,11 +244,11 @@
         return;
       }
       if (data.tipo === 'codigo') {
-        renderCartao(data.requisicao);
+        renderCartao(data.requisicao, { somenteIntencao });
         return;
       }
       pacientesDaBusca = data.pacientes || [];
-      if (pacientesDaBusca.length === 1) renderPaciente(pacientesDaBusca[0], 0);
+      if (pacientesDaBusca.length === 1) renderPaciente(pacientesDaBusca[0], 0, { somenteIntencao });
       else renderEscolha(pacientesDaBusca, { truncado: data.truncado, total: data.total });
     } catch (e) {
       if (minhaGeracao !== geracao) return;
@@ -207,6 +256,35 @@
     } finally {
       if (minhaGeracao === geracao) btn.disabled = false;
     }
+  }
+
+  // Chamada pelo #5 (agent_intent.js) quando a análise da conversa reconhece
+  // uma intenção com confiança suficiente. Só aparece se o painel ainda não
+  // tiver nenhum resultado (não sobrescreve uma consulta manual em andamento).
+  function mostrarDeteccao({ intencao, confianca, identificadores }) {
+    // Uma detecção nova pode atualizar outra detecção (a conversa evoluiu),
+    // mas nunca pisa numa busca manual que o atendente já iniciou.
+    if (origemConteudoAtual === 'manual') return;
+    const termoBusca = (identificadores && (identificadores.codRequisicao || identificadores.cpf || identificadores.nome)) || null;
+    const percentual = Math.round((confianca || 0) * 100);
+
+    body.innerHTML = `
+      <div class="agent-estado agent-estado-deteccao">
+        <i class="ph-bold ph-sparkle"></i>
+        <div>
+          <strong>Intenção detectada:</strong> ${escapeHtml(LABEL_PROCESSO[intencao] || intencao)} (${percentual}%)
+          ${termoBusca
+            ? `<div class="agent-acoes"><button type="button" class="agent-btn-secundario" id="agent-consultar-deteccao"><i class="ph-bold ph-magnifying-glass"></i> Consultar</button></div>`
+            : `<div class="agent-estado-detalhe">Não encontrei CPF ou código na conversa. Peça o documento ou digite manualmente abaixo.</div>`}
+        </div>
+      </div>`;
+
+    const btnConsultar = document.getElementById('agent-consultar-deteccao');
+    if (btnConsultar) {
+      btnConsultar.addEventListener('click', () => consultar(termoBusca, { somenteIntencao: intencao }));
+    }
+    origemConteudoAtual = 'deteccao';
+    abrir();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -228,5 +306,5 @@
     });
   });
 
-  window.agentPanel = { abrir, fechar, reset, consultar };
+  window.agentPanel = { abrir, fechar, reset, consultar, mostrarDeteccao };
 })();

@@ -92,6 +92,18 @@ app.use('/api/aplis', requireAtendente);
 // -----------------------------------------------------------------------------
 const { criarAplisClient, AplisError } = require('./lib/aplis/client');
 const { consultarPorCodigo, buscarPorPaciente, classificarTermo } = require('./lib/aplis/consultas');
+const { calcularSugestoes } = require('./lib/processos/sugestoes');
+
+// Encontrada uma única "situação" (por código, ou por paciente já
+// desambiguado), anexa nela mesma quais respostas prontas ela sustenta —
+// assim `sugestoes` viaja junto de onde o painel já espera encontrá-la
+// (data.requisicao.sugestoes ou pacientes[0].requisicoes[0].sugestoes).
+async function anexarSugestoes(resultado) {
+  const situacao = resultado.requisicao || (resultado.pacientes && resultado.pacientes.length === 1 ? resultado.pacientes[0].requisicoes[0] : null);
+  if (!situacao) return resultado;
+  situacao.sugestoes = await calcularSugestoes(situacao);
+  return resultado;
+}
 
 const aplisClient = (process.env.APLIS_BASE_URL && process.env.APLIS_USUARIO && process.env.APLIS_SENHA)
   ? criarAplisClient({
@@ -293,9 +305,70 @@ app.post('/api/aplis/consultar', async (req, res) => {
       rastro = `tipo=${classificado.tipo} pacientes=${resultado.pacientes.length} janelaDias=${resultado.janelaDias}`;
     }
     console.log(`[aplis] consulta ${rastro} atendente=${req.atendente.id} encontrado=${resultado.encontrado} em=${new Date().toISOString()}`);
+    if (resultado.encontrado) resultado = await anexarSugestoes(resultado);
     return res.json({ tipo: classificado.tipo, ...resultado });
   } catch (err) {
     return responderErroAplis(res, err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// DETECÇÃO DE INTENÇÃO (GEMINI) — lista fechada, com limiar de confiança e
+// teto diário por atendente. Nunca decide sozinho: só classifica; a consulta
+// ao apLIS e a escolha da resposta continuam exigindo identificador confirmado.
+// -----------------------------------------------------------------------------
+const { criarClassificadorIntencao } = require('./lib/agent/gemini');
+const { criarLimitadorDiario } = require('./lib/agent/limitador');
+const { extrairIdentificadoresDeTexto } = require('./lib/processos/identificadores');
+
+const classificadorIntencao = process.env.GEMINI_API_KEY
+  ? criarClassificadorIntencao({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite', timeoutMs: 8000 })
+  : null;
+
+const LIMIAR_CONFIANCA_MINIMA = Number(process.env.AGENT_CONFIANCA_MINIMA) || 0.6;
+const limitadorDiario = criarLimitadorDiario({ teto: Number(process.env.AGENT_TETO_DIARIO) || 200 });
+
+// POST /api/agent/analisar — Body: { mensagens: [{fromMe, body}, ...] } (últimas ~30)
+app.post('/api/agent/analisar', async (req, res) => {
+  if (!classificadorIntencao) {
+    return res.status(503).json({ error: 'Detecção de intenção não configurada no servidor.', tipo: 'nao_configurado' });
+  }
+
+  const mensagens = Array.isArray(req.body && req.body.mensagens) ? req.body.mensagens : [];
+  // Shape estável em toda resposta (com ou sem sucesso do modelo): sempre
+  // {codRequisicao, cpf, credencialPortal, nome}, nunca faltando "nome".
+  const identificadoresRegex = { ...extrairIdentificadoresDeTexto(mensagens.map((m) => m && m.body)), nome: null };
+
+  if (!limitadorDiario.permitir(req.atendente.id)) {
+    // Degrada para "sem sugestão": os identificadores por regex continuam valendo,
+    // só a classificação por LLM é que não roda.
+    return res.json({ intencao: null, confianca: 0, motivo: 'teto_diario_atingido', identificadores: identificadoresRegex });
+  }
+
+  try {
+    const classificacao = await classificadorIntencao.classificar(mensagens);
+    const identificadores = { ...identificadoresRegex, nome: classificacao.nome };
+
+    if (classificacao.intencao === 'outro') {
+      // Nunca chatId, CPF, nome ou conteúdo de mensagem — só o necessário para
+      // priorizar qual processo mapear em seguida.
+      console.log(`[agent] intencao=outro confianca=${classificacao.confianca} resumo=${JSON.stringify(classificacao.resumoLivre)} em=${new Date().toISOString()}`);
+    }
+
+    if (classificacao.confianca < LIMIAR_CONFIANCA_MINIMA) {
+      return res.json({ intencao: null, confianca: classificacao.confianca, motivo: 'baixa_confianca', identificadores });
+    }
+
+    return res.json({
+      intencao: classificacao.intencao,
+      confianca: classificacao.confianca,
+      identificadores,
+      resumoLivre: classificacao.intencao === 'outro' ? classificacao.resumoLivre : null
+    });
+  } catch (err) {
+    console.error('[agent] erro na classificação de intenção:', err && err.message);
+    // Falha do modelo não pode travar o atendimento: volta só o que o regex já sabia.
+    return res.json({ intencao: null, confianca: 0, motivo: 'erro_modelo', identificadores: identificadoresRegex });
   }
 });
 

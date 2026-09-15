@@ -143,6 +143,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Único ponto de entrada para módulos externos (painel do agente) preencherem
+  // o campo de digitação. Nunca envia — só coloca o texto e devolve o foco,
+  // igual ao "Inserir" das respostas rápidas.
+  window.inserirNoCampoDeMensagem = function (texto) {
+    if (!messageTextInput) return;
+    messageTextInput.value = texto;
+    autoResizeTextarea();
+    messageTextInput.focus();
+  };
+
   function refreshLucideIcons() {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       try { window.lucide.createIcons(); } catch (e) { }
@@ -737,7 +747,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const isNearBottom = messagesContainerEl.scrollHeight - messagesContainerEl.scrollTop - messagesContainerEl.clientHeight < 140;
 
         renderMessages(sortedMessages);
-        
+        if (window.agentIntent) window.agentIntent.analisar(chatId, sortedMessages);
+
         if (!silent || isNearBottom) {
           scrollToBottom();
         }

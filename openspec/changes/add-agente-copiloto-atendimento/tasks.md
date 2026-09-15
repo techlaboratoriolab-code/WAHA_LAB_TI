@@ -35,47 +35,47 @@
 
 ## 5. Motor de processos
 
-- [ ] 5.1 Definir o contrato do registro de processo: identificador, intenção, requisitos, buscar, renderizar, avisos
-- [ ] 5.2 Implementar o ciclo detectar → buscar → renderizar → avisar
-- [ ] 5.3 Aceitar declaração ou função em cada etapa, de forma independente
-- [ ] 5.4 Garantir que a consulta ao apLIS só aconteça através do motor, sem acesso a credencial pelos processos
-- [ ] 5.5 Aplicar no motor a confirmação obrigatória, o cache e o teto de consumo
-- [ ] 5.6 Tratar intenção sem processo correspondente, informando e registrando a ocorrência
+- [x] 5.1 Definir o contrato do registro de processo: identificador, intenção, requisitos, buscar, renderizar, avisos
+- [x] 5.2 Implementar o ciclo detectar → buscar → renderizar → avisar
+- [x] 5.3 Aceitar declaração ou função em cada etapa, de forma independente
+- [x] 5.4 Garantir que a consulta ao apLIS só aconteça através do motor, sem acesso a credencial pelos processos
+- [x] 5.5 Aplicar no motor a confirmação obrigatória, o cache e o teto de consumo
+- [x] 5.6 Tratar intenção sem processo correspondente, informando e registrando a ocorrência
 
 ## 6. Catálogo inicial e templates
 
-- [ ] 6.1 Criar `public/agent_templates.js` com os templates do agente, sem alterar `quick_responses.js`
-- [ ] 6.2 Declarar o processo `previsao_entrega`, inteiramente declarativo
-- [ ] 6.3 Declarar o processo `laudo_disponivel`, apontando para o portal sem anexar PDF
-- [ ] 6.4 Declarar o processo `status_exame`, inteiramente declarativo
-- [ ] 6.5 Confirmar que nenhum dos três usa a escotilha de função
-- [ ] 6.6 Omitir o template quando faltar dado para alguma lacuna e registrar a lacuna não preenchida
+- [x] 6.1 Criar `public/agent_templates.js` com os templates do agente, sem alterar `quick_responses.js`
+- [x] 6.2 Declarar o processo `previsao_entrega`, inteiramente declarativo
+- [x] 6.3 Declarar o processo `laudo_disponivel`, apontando para o portal sem anexar PDF
+- [x] 6.4 Declarar o processo `status_exame`, inteiramente declarativo
+- [x] 6.5 Confirmar que nenhum dos três usa a escotilha de função
+- [x] 6.6 Omitir o template quando faltar dado para alguma lacuna e registrar a lacuna não preenchida
 
 ## 7. Detecção de intenção
 
-- [ ] 7.1 Adicionar `@google/genai` e configurar o cliente Gemini no servidor
-- [ ] 7.2 Definir o JSON Schema de saída com enum de quatro intenções, identificadores e confiança
-- [ ] 7.3 Criar `POST /api/agent/analisar`, recebendo as últimas 30 mensagens e devolvendo a classificação
-- [ ] 7.4 Implementar o limiar de confiança, exibindo indefinição abaixo dele
-- [ ] 7.5 Implementar reconhecimento por expressão regular de requisição de 13 dígitos, CPF e credencial `P#####`
-- [ ] 7.6 Registrar em log estruturado as classificações `outro`, sem `chatId`, CPF ou nome
-- [ ] 7.7 Aplicar teto diário por atendente, degradando para operação sem sugestão
+- [x] 7.1 Adicionar `@google/genai` e configurar o cliente Gemini no servidor
+- [x] 7.2 Definir o JSON Schema de saída com enum de quatro intenções, identificadores e confiança
+- [x] 7.3 Criar `POST /api/agent/analisar`, recebendo as últimas 30 mensagens e devolvendo a classificação
+- [x] 7.4 Implementar o limiar de confiança, exibindo indefinição abaixo dele
+- [x] 7.5 Implementar reconhecimento por expressão regular de requisição de 13 dígitos, CPF e credencial `P#####`
+- [x] 7.6 Registrar em log estruturado as classificações `outro`, sem `chatId`, CPF ou nome
+- [x] 7.7 Aplicar teto diário por atendente, degradando para operação sem sugestão
 
 ## 8. Disparo e cache no cliente
 
-- [ ] 8.1 Disparar a análise em `selectChat()`, ao abrir a conversa
-- [ ] 8.2 Disparar novamente quando chegar mensagem com a conversa aberta
-- [ ] 8.3 Implementar cache por `chatId` somado ao id da última mensagem
-- [ ] 8.4 Bloquear qualquer disparo em conversas `@g.us`
+- [x] 8.1 Disparar a análise em `selectChat()`, ao abrir a conversa
+- [x] 8.2 Disparar novamente quando chegar mensagem com a conversa aberta
+- [x] 8.3 Implementar cache por `chatId` somado ao id da última mensagem
+- [x] 8.4 Bloquear qualquer disparo em conversas `@g.us`
 - [ ] 8.5 Respeitar `AGENT_ENABLED` e a lista de atendentes habilitados
 
 ## 9. Painel do agente
 
 - [x] 9.1 Criar o painel acima do campo de digitação, seguindo o padrão do `#reply-preview-bar`
 - [x] 9.2 Renderizar o cartão de dados incluindo o código da requisição
-- [ ] 9.3 Implementar a ação "Inserir", que apenas preenche o campo e devolve o foco
+- [x] 9.3 Implementar a ação "Inserir", que apenas preenche o campo e devolve o foco
 - [x] 9.4 Implementar a lista de escolha quando houver mais de um paciente, sem sugestão antes da seleção
-- [ ] 9.5 Implementar o estado de intenção sem identificador, com resposta pedindo CPF e campo de digitação manual
+- [x] 9.5 Implementar o estado de intenção sem identificador, com resposta pedindo CPF e campo de digitação manual
 - [ ] 9.6 Implementar os três níveis de aviso por cor, com os tokens de tema existentes
 - [ ] 9.7 Criar `public/parceiros.js` e aplicar a marcação clínica/paciente
 - [x] 9.8 Manter o painel oculto quando não houver intenção nem aviso

@@ -99,7 +99,9 @@ Sem isso, toda segunda-feira nasce com dezenas de pendências de 60 horas vindas
 
 **Sugestão errada chegar ao paciente** → Nenhum envio automático. O painel apenas preenche o campo, e todo dado exibido mostra o código da requisição para conferência.
 
-**Custo fora de controle em dia atípico** → Cache por conversa, teto diário por atendente, habilitação por lista de atendentes, e desligamento global.
+**Custo fora de controle em dia atípico** → Cache por conversa, teto diário por atendente, habilitação por lista de atendentes, e desligamento global. **Limitação conhecida:** o teto diário (`lib/agent/limitador.js`) é um contador em memória do processo — correto no VPS/processo único de hoje, mas não soma entre instâncias se o deploy for serverless com múltiplas réplicas simultâneas, nem sobrevive a um cold start. Vira teto por instância, não teto global, até esse contador migrar para um armazenamento compartilhado.
+
+**Motor de processos ainda não é o caminho real de busca** → `lib/processos/motor.js` e `lib/processos/ferramentas.js` têm o ciclo completo (buscar → renderizar, com a escotilha por etapa) testado e correto isoladamente, mas a rota `/api/aplis/consultar` de produção ainda chama `consultarPorCodigo`/`buscarPorPaciente` direto, sem passar pelo motor; `lib/processos/sugestoes.js` também monta sua própria ferramenta local em vez de reutilizar `ferramentas.js`. A garantia de "todo processo só toca o apLIS através do motor" está provada em teste, não em produção. Fica para a fiação completa da #6 — trocar a rota para `executarProcesso` + `criarFerramentasProcesso` de verdade.
 
 **Ausência de trilha de auditoria de acesso a paciente** → Consequência aceita da decisão de não usar banco. Mitigação parcial: log estruturado no servidor com atendente e código de requisição, sem dado identificável. Resolve-se de fato quando a fase do dashboard introduzir persistência.
 
