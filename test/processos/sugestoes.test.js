@@ -30,3 +30,34 @@ test('cada sugestão traz a intenção que a originou', async () => {
   const status = sugestoes.find((s) => s.processoId === 'status_exame');
   assert.equal(status.intencao, 'status_exame');
 });
+
+test('com redator, o texto vem dele e a conversa chega até a chamada', async () => {
+  const chamadas = [];
+  const redator = {
+    redigir: async ({ situacao, referencia, mensagens }) => {
+      chamadas.push({ situacao, referencia, mensagens });
+      return { texto: 'Mensagem do redator para ' + situacao.exame };
+    }
+  };
+  const mensagens = [{ fromMe: false, body: 'quando meu exame fica pronto?' }];
+  const sugestoes = await calcularSugestoes(SITUACAO_COMPLETA, { redator, mensagens });
+
+  assert.equal(sugestoes.length, 3);
+  assert.ok(sugestoes.every((s) => s.texto.startsWith('Mensagem do redator para')));
+  assert.equal(chamadas.length, 3);
+  assert.deepEqual(chamadas[0].mensagens, mensagens);
+  assert.equal(typeof chamadas[0].referencia, 'string');
+});
+
+test('cada sugestão carrega de qual referência de Resposta Rápida ela partiu', async () => {
+  const redator = { redigir: async () => ({ texto: 'x' }) };
+  const sugestoes = await calcularSugestoes(SITUACAO_COMPLETA, { redator });
+  assert.ok(sugestoes.every((s) => typeof s.baseadoEm === 'string' && s.baseadoEm.length > 0));
+});
+
+test('redator que falha (devolve null) ainda produz sugestão pelo template fixo', async () => {
+  const redator = { redigir: async () => null };
+  const sugestoes = await calcularSugestoes(SITUACAO_COMPLETA, { redator });
+  assert.equal(sugestoes.length, 3);
+  assert.equal(sugestoes.find((s) => s.processoId === 'previsao_entrega').baseadoEm, null);
+});

@@ -45,11 +45,14 @@
 ## 6. Catálogo inicial e templates
 
 - [x] 6.1 Criar `public/agent_templates.js` com os templates do agente, sem alterar `quick_responses.js`
-- [x] 6.2 Declarar o processo `previsao_entrega`, inteiramente declarativo
+- [x] 6.2 Declarar o processo `previsao_entrega` (busca declarativa; ver 6.7 sobre a renderização)
 - [x] 6.3 Declarar o processo `laudo_disponivel`, apontando para o portal sem anexar PDF
-- [x] 6.4 Declarar o processo `status_exame`, inteiramente declarativo
-- [x] 6.5 Confirmar que nenhum dos três usa a escotilha de função
+- [x] 6.4 Declarar o processo `status_exame` (busca declarativa; ver 6.7 sobre a renderização)
+- [x] ~~6.5 Confirmar que nenhum dos três usa a escotilha de função~~ — superado por decisão posterior (ver 6.7): a busca continua declarativa nos três; a renderização passou a usar a escotilha de propósito
 - [x] 6.6 Omitir o template quando faltar dado para alguma lacuna e registrar a lacuna não preenchida
+- [x] 6.7 Basear a sugestão nas Respostas Rápidas existentes: `lib/agent/redator.js` (Gemini, ancorado em fatos do apLIS + referência de estilo + contexto da conversa) e `lib/processos/referencias_respostas_rapidas.js`; a etapa de renderizar dos três processos vira função, com o template fixo original como fallback determinístico se o redator faltar ou falhar
+- [x] 6.8 Rodar as três chamadas ao redator em paralelo (`Promise.all` em `calcularSugestoes`), não em série
+- [x] 6.9 Threading do contexto de conversa ponta a ponta: `agent_intent.js` guarda as últimas mensagens por chat, `agent_panel.js` as reaproveita em toda consulta (detectada ou manual) via `chatIdAtual`
 
 ## 7. Detecção de intenção
 
@@ -93,14 +96,14 @@
 
 ## 11. Verificação
 
-- [ ] 11.1 Testar consulta com código válido, inválido e requisição cancelada
-- [ ] 11.2 Confirmar que comando de escrita é recusado pelo cliente do apLIS
-- [ ] 11.3 Confirmar que requisição sem token retorna 401 e não alcança serviços externos
-- [ ] 11.4 Testar busca que retorna múltiplos pacientes e confirmar que nenhuma sugestão aparece antes da escolha
+- [x] 11.1 Testar consulta com código válido, inválido e requisição cancelada
+- [x] 11.2 Confirmar que comando de escrita é recusado pelo cliente do apLIS
+- [x] 11.3 Confirmar que requisição sem token retorna 401 e não alcança serviços externos
+- [x] 11.4 Testar busca que retorna múltiplos pacientes e confirmar que nenhuma sugestão aparece antes da escolha
 - [ ] 11.5 Deixar conversa lida e sem resposta por 10 minutos e confirmar a sinalização nos três canais
 - [ ] 11.6 Confirmar que o relógio de pendência não avança fora do expediente
-- [ ] 11.7 Confirmar que nenhuma credencial aparece no código entregue ao navegador
-- [ ] 11.8 Confirmar que log nenhum contém CPF, nome, telefone ou conteúdo de mensagem
+- [x] 11.7 Confirmar que nenhuma credencial aparece no código entregue ao navegador
+- [x] 11.8 Confirmar que log nenhum contém CPF, nome, telefone ou conteúdo de mensagem
 - [ ] 11.9 Com `AGENT_ENABLED` desligado, confirmar que a interface se comporta exatamente como antes
 - [ ] 11.10 Confirmar que o agente permanece inativo em conversas de grupo
 

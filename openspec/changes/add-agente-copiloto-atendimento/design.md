@@ -89,6 +89,16 @@ Sem isso, toda segunda-feira nasce com dezenas de pendências de 60 horas vindas
 
 `requisicaoLaudo` devolve o PDF em base64 e o sistema já sabe enviar arquivo — tecnicamente daria para anexar sozinho. Isso faria o agente despachar resultado clínico para um número de WhatsApp com base em identificação digitada no chat. Se o número for de um familiar, ou o CPF estiver errado, o vazamento não tem volta. O fluxo mantém o que o laboratório já faz: avisa que está pronto e aponta para o portal, onde o paciente entra com as credenciais dele.
 
+### Sugestão baseada nas Respostas Rápidas existentes, com fallback determinístico
+
+Decisão original (Q7/Q12 da sessão de grilling): sem LLM redigindo, só template fixo com lacunas — para não arriscar tom ou dado errado. Pedido posterior do usuário reabriu isso: a sugestão deveria se basear no catálogo de 65 Respostas Rápidas já em uso (`public/quick_responses.js`, nunca alterado) e no contexto real da conversa, não copiando o atalho ao pé da letra.
+
+A saída usa a escotilha por etapa que o motor já previa (Q33): a etapa de `renderizar` dos três processos do MVP passou de declaração para função. Essa função pede ao redator (`lib/agent/redator.js`, Gemini) uma mensagem ancorada em (1) os fatos já confirmados no apLIS — nunca o nome, CPF ou código do paciente, que o modelo não precisa ver —, (2) um trecho de referência copiado do estilo de uma Resposta Rápida (`lib/processos/referencias_respostas_rapidas.js`, cópia deliberadamente expurgada de "[Nome da Paciente]" e da auto-apresentação fixa "Me chamo Thainá" que o original carrega — copiar isso ao pé da letra seria uma mentira institucional toda vez que outro atendente usasse), e (3) as últimas mensagens da conversa, quando disponíveis.
+
+Se o redator não estiver configurado ou falhar (rede, timeout, resposta vazia), a mesma função cai no template fixo original — o mecanismo determinístico continua existindo e testado, agora como rede de segurança em vez de único caminho. As três chamadas ao redator (uma por processo) rodam em paralelo: ~3,2s em série virou ~1,5s.
+
+Testado ao vivo: a mesma situação (exame, status, previsão) gera texto diferente dependendo da conversa — um paciente que já perguntou antes e está ansioso recebe "Compreendo a sua preocupação..." em vez do texto neutro padrão, sem que nenhum fato seja inventado.
+
 ## Risks / Trade-offs
 
 **Classificação errada de intenção com modelo econômico** → Limiar de confiança exibe indefinição em vez de intenção errada; piloto de duas semanas mede a taxa real; troca de modelo é configuração.

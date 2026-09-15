@@ -16,6 +16,9 @@
   // 'deteccao' | 'manual' | null — uma detecção nova pode substituir outra
   // detecção, mas nunca uma busca manual que o atendente já iniciou.
   let origemConteudoAtual = null;
+  // Id do chat aberto, só para buscar o contexto de conversa já analisado por
+  // agent_intent.js (não guardamos as mensagens aqui, evita duplicar estado).
+  let chatIdAtual = null;
 
   function escapeHtml(str) {
     return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -33,11 +36,12 @@
   }
 
   // Ao trocar de conversa, nada do painel pode sobreviver: evita vazar dado de um chat para outro.
-  function reset() {
+  function reset(chatId) {
     geracao++;
     pacientesDaBusca = [];
     somenteIntencaoAtual = null;
     origemConteudoAtual = null;
+    chatIdAtual = chatId || null;
     body.innerHTML = '';
     input.value = '';
     btn.disabled = false;
@@ -207,11 +211,23 @@
     nao_configurado: 'Integração com o apLIS não está configurada.'
   };
 
+  // Sempre que possível, anexa o contexto de conversa já analisado por
+  // agent_intent.js — assim a sugestão vem ajustada ao que o paciente
+  // realmente perguntou, tanto na busca automática (detecção) quanto na
+  // manual (o atendente digitou o código/CPF/nome ele mesmo).
+  function comContextoDaConversa(corpo) {
+    if (corpo.mensagens || !chatIdAtual || !window.agentIntent || typeof window.agentIntent.obterMensagensRecentes !== 'function') {
+      return corpo;
+    }
+    const mensagens = window.agentIntent.obterMensagensRecentes(chatIdAtual);
+    return mensagens ? { ...corpo, mensagens } : corpo;
+  }
+
   async function chamarConsulta(corpo) {
     const res = await window.agentFetch('/api/aplis/consultar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(corpo)
+      body: JSON.stringify(comContextoDaConversa(corpo))
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {

@@ -122,3 +122,41 @@ test('processo em função não consegue pular o requer_escolha ao consultar fer
   const r = await executarProcesso(processo, { identificadores: { nome: 'Maria' } }, ferramentas, {});
   assert.equal(r.resultado, 'requer_escolha');
 });
+
+test('renderizar em função que devolve null vira sem_dado_suficiente, nunca uma sugestão vazia', async () => {
+  const processo = { id: 'custom', intencao: 'custom', buscar: { tipo: 'consultarPaciente' }, renderizar: async () => null };
+  const r = await executarProcesso(processo, { identificadores: { cpf: '1' } }, ferramentasFake(SITUACAO_UNICA), {});
+  assert.equal(r.resultado, 'sem_dado_suficiente');
+  assert.equal(r.sugestao, null);
+});
+
+test('renderizar em função que devolve objeto sem texto também vira sem_dado_suficiente', async () => {
+  const processo = { id: 'custom', intencao: 'custom', buscar: { tipo: 'consultarPaciente' }, renderizar: async () => ({ lacunas: ['statusCliente'] }) };
+  const r = await executarProcesso(processo, { identificadores: { cpf: '1' } }, ferramentasFake(SITUACAO_UNICA), {});
+  assert.equal(r.resultado, 'sem_dado_suficiente');
+  assert.deepEqual(r.lacunas, ['statusCliente']);
+});
+
+test('renderizar em função recebe o apoio passado a executarProcesso (ex: um redator)', async () => {
+  const apoio = { redigir: async () => ({ texto: 'texto do redator' }) };
+  const processo = {
+    id: 'custom', intencao: 'custom', buscar: { tipo: 'consultarPaciente' },
+    renderizar: async (situacao, contexto, apoioRecebido) => {
+      const r = await apoioRecebido.redigir();
+      return { texto: r.texto };
+    }
+  };
+  const r = await executarProcesso(processo, { identificadores: { cpf: '1' } }, ferramentasFake(SITUACAO_UNICA), {}, apoio);
+  assert.equal(r.resultado, 'sugestao');
+  assert.equal(r.sugestao.texto, 'texto do redator');
+});
+
+test('sem apoio, renderizar em função recebe um objeto vazio (não undefined) como terceiro argumento', async () => {
+  let apoioRecebido;
+  const processo = {
+    id: 'custom', intencao: 'custom', buscar: { tipo: 'consultarPaciente' },
+    renderizar: async (situacao, contexto, apoio) => { apoioRecebido = apoio; return { texto: 'x' }; }
+  };
+  await executarProcesso(processo, { identificadores: { cpf: '1' } }, ferramentasFake(SITUACAO_UNICA), {});
+  assert.deepEqual(apoioRecebido, {});
+});

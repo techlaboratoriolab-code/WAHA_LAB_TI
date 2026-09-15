@@ -98,10 +98,13 @@ const { calcularSugestoes } = require('./lib/processos/sugestoes');
 // desambiguado), anexa nela mesma quais respostas prontas ela sustenta —
 // assim `sugestoes` viaja junto de onde o painel já espera encontrá-la
 // (data.requisicao.sugestoes ou pacientes[0].requisicoes[0].sugestoes).
-async function anexarSugestoes(resultado) {
+// `redator` só existe depois que o bloco do Gemini, mais abaixo neste arquivo,
+// terminar de carregar — como isto só é chamado dentro de uma rota (nunca no
+// carregamento do módulo), a constante já está pronta a essa altura.
+async function anexarSugestoes(resultado, mensagens) {
   const situacao = resultado.requisicao || (resultado.pacientes && resultado.pacientes.length === 1 ? resultado.pacientes[0].requisicoes[0] : null);
   if (!situacao) return resultado;
-  situacao.sugestoes = await calcularSugestoes(situacao);
+  situacao.sugestoes = await calcularSugestoes(situacao, { redator, mensagens });
   return resultado;
 }
 
@@ -281,13 +284,15 @@ app.get('/api/agent/eu', (req, res) => {
 });
 
 // 5. POST /api/aplis/consultar — Consulta no apLIS (somente leitura)
-// Body: { termo, ampliar? }. O termo pode ser código de requisição (13 dígitos),
-// CPF ou nome; a resposta indica o tipo reconhecido.
+// Body: { termo, ampliar?, mensagens? }. O termo pode ser código de requisição
+// (13 dígitos), CPF ou nome. `mensagens` é opcional — quando vem (a busca partiu
+// de uma intenção detectada), a resposta sugerida é redigida com esse contexto;
+// sem ele, a sugestão ainda existe, só sem ajuste fino ao que o paciente perguntou.
 app.post('/api/aplis/consultar', async (req, res) => {
   if (!aplisClient) {
     return res.status(503).json({ error: 'Integração com o apLIS não configurada no servidor.', tipo: 'nao_configurado' });
   }
-  const { termo, ampliar } = req.body || {};
+  const { termo, ampliar, mensagens } = req.body || {};
   const classificado = classificarTermo(termo);
   if (!classificado) {
     return res.status(400).json({ error: 'Informe um código de requisição, CPF ou nome com pelo menos 3 caracteres.', tipo: 'entrada_invalida' });
@@ -305,7 +310,10 @@ app.post('/api/aplis/consultar', async (req, res) => {
       rastro = `tipo=${classificado.tipo} pacientes=${resultado.pacientes.length} janelaDias=${resultado.janelaDias}`;
     }
     console.log(`[aplis] consulta ${rastro} atendente=${req.atendente.id} encontrado=${resultado.encontrado} em=${new Date().toISOString()}`);
-    if (resultado.encontrado) resultado = await anexarSugestoes(resultado);
+    // Nunca confia no tamanho que o cliente manda: mesmo que ele já corte em
+    // 30, o servidor limita de novo antes de gastar tokens no redator.
+    const mensagensParaRedator = Array.isArray(mensagens) ? mensagens.slice(-30) : undefined;
+    if (resultado.encontrado) resultado = await anexarSugestoes(resultado, mensagensParaRedator);
     return res.json({ tipo: classificado.tipo, ...resultado });
   } catch (err) {
     return responderErroAplis(res, err);
@@ -318,11 +326,20 @@ app.post('/api/aplis/consultar', async (req, res) => {
 // ao apLIS e a escolha da resposta continuam exigindo identificador confirmado.
 // -----------------------------------------------------------------------------
 const { criarClassificadorIntencao } = require('./lib/agent/gemini');
+const { criarRedator } = require('./lib/agent/redator');
 const { criarLimitadorDiario } = require('./lib/agent/limitador');
 const { extrairIdentificadoresDeTexto } = require('./lib/processos/identificadores');
 
+const GEMINI_MODEL_PADRAO = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+
 const classificadorIntencao = process.env.GEMINI_API_KEY
-  ? criarClassificadorIntencao({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite', timeoutMs: 8000 })
+  ? criarClassificadorIntencao({ apiKey: process.env.GEMINI_API_KEY, model: GEMINI_MODEL_PADRAO, timeoutMs: 8000 })
+  : null;
+
+// Usado por anexarSugestoes (definido acima, mas só executado dentro de uma
+// rota — a essa altura o módulo já terminou de carregar).
+const redator = process.env.GEMINI_API_KEY
+  ? criarRedator({ apiKey: process.env.GEMINI_API_KEY, model: GEMINI_MODEL_PADRAO, timeoutMs: 8000 })
   : null;
 
 const LIMIAR_CONFIANCA_MINIMA = Number(process.env.AGENT_CONFIANCA_MINIMA) || 0.6;
@@ -334,7 +351,8 @@ app.post('/api/agent/analisar', async (req, res) => {
     return res.status(503).json({ error: 'Detecção de intenção não configurada no servidor.', tipo: 'nao_configurado' });
   }
 
-  const mensagens = Array.isArray(req.body && req.body.mensagens) ? req.body.mensagens : [];
+  // Nunca confia no tamanho que o cliente manda, mesmo que ele já corte em 30.
+  const mensagens = Array.isArray(req.body && req.body.mensagens) ? req.body.mensagens.slice(-30) : [];
   // Shape estável em toda resposta (com ou sem sucesso do modelo): sempre
   // {codRequisicao, cpf, credencialPortal, nome}, nunca faltando "nome".
   const identificadoresRegex = { ...extrairIdentificadoresDeTexto(mensagens.map((m) => m && m.body)), nome: null };

@@ -645,7 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   async function selectChat(chat) {
     clearReplyMessage();
-    if (window.agentPanel) window.agentPanel.reset();
+    if (window.agentPanel) window.agentPanel.reset(chat.id);
     lastRenderedChatId = chat.id;
     lastRenderedSignature = '';
 

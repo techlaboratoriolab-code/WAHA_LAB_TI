@@ -5,8 +5,10 @@
 // mensagem nova com o chat aberto), nunca a cada mensagem isoladamente:
 // só quando o conjunto de mensagens realmente muda.
 (function () {
-  // chatId -> { chave, resultado } — evita reanalisar quando nada mudou, e
-  // reexibe a mesma detecção ao reabrir a conversa sem gastar chamada nova.
+  // chatId -> { chave, resultado, mensagens } — evita reanalisar quando nada
+  // mudou, reexibe a mesma detecção ao reabrir a conversa sem gastar chamada
+  // nova, e guarda as mensagens para o painel poder redigir com o mesmo
+  // contexto que gerou a detecção (obterMensagensRecentes).
   const cachePorChat = new Map();
 
   function textoDaMensagem(m) {
@@ -57,7 +59,7 @@
         ? { intencao: data.intencao, confianca: data.confianca, identificadores: data.identificadores || {} }
         : null;
 
-      cachePorChat.set(chatId, { chave, resultado });
+      cachePorChat.set(chatId, { chave, resultado, mensagens: ultimas30 });
       if (resultado) window.agentPanel.mostrarDeteccao(resultado);
     } catch (e) {
       // Falha de rede na detecção não pode incomodar o atendente: o painel
@@ -65,5 +67,13 @@
     }
   }
 
-  window.agentIntent = { analisar };
+  // O painel usa isto para redigir a sugestão com o mesmo contexto que gerou
+  // a detecção (ou, numa busca manual, com o contexto mais recente disponível
+  // da conversa aberta) — sem precisar app.js expor suas mensagens direto.
+  function obterMensagensRecentes(chatId) {
+    const cache = chatId && cachePorChat.get(chatId);
+    return cache ? cache.mensagens : null;
+  }
+
+  window.agentIntent = { analisar, obterMensagensRecentes };
 })();
