@@ -53,11 +53,12 @@
 - [x] 6.7 Basear a sugestão nas Respostas Rápidas existentes: `lib/agent/redator.js` (Gemini, ancorado em fatos do apLIS + pool de referências de estilo + contexto da conversa) e `lib/processos/referencias_respostas_rapidas.js`; a etapa de renderizar dos três processos vira função, com o template fixo original como fallback determinístico se o redator faltar ou falhar. Seleção da referência é dinâmica pelo contexto (não fixa por processo): os três processos oferecem o mesmo pool e o redator escolhe/relata via `baseadoEmId`, validado contra a lista oferecida antes de ser aceito
 - [x] 6.8 Rodar as três chamadas ao redator em paralelo (`Promise.all` em `calcularSugestoes`), não em série
 - [x] 6.9 Threading do contexto de conversa ponta a ponta: `agent_intent.js` guarda as últimas mensagens por chat, `agent_panel.js` as reaproveita em toda consulta (detectada ou manual) via `chatIdAtual`
+- [x] 6.10 4ª capacidade — `orientacao_preparo` (achado ao vivo: pergunta real de paciente sobre preparo para exame de sangue não gerava sugestão): `lib/agent/respostas_faq.js`, caminho paralelo ao motor de processos para intenções sem dado de paciente, citando a Resposta Rápida `PREPARO` literalmente (nunca pelo redator — são instruções quase-clínicas). Também corrigido: `outro` com confiança alta não deve mais aparecer como "Intenção detectada: outro" no painel
 
 ## 7. Detecção de intenção
 
 - [x] 7.1 Adicionar `@google/genai` e configurar o cliente Gemini no servidor
-- [x] 7.2 Definir o JSON Schema de saída com enum de quatro intenções, identificadores e confiança
+- [x] 7.2 Definir o JSON Schema de saída com enum de intenções (hoje cinco, ver 6.10), identificadores e confiança
 - [x] 7.3 Criar `POST /api/agent/analisar`, recebendo as últimas 30 mensagens e devolvendo a classificação
 - [x] 7.4 Implementar o limiar de confiança, exibindo indefinição abaixo dele
 - [x] 7.5 Implementar reconhecimento por expressão regular de requisição de 13 dígitos, CPF e credencial `P#####`

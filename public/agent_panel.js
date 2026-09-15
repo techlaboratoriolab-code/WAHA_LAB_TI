@@ -126,7 +126,12 @@
     if (minimizado) definirContagemNaoVistas(0);
   }
 
-  const LABEL_PROCESSO = { previsao_entrega: 'Previsão de entrega', status_exame: 'Status do exame', laudo_disponivel: 'Laudo / portal' };
+  const LABEL_PROCESSO = {
+    previsao_entrega: 'Previsão de entrega',
+    status_exame: 'Status do exame',
+    laudo_disponivel: 'Laudo / portal',
+    orientacao_preparo: 'Preparo para o exame'
+  };
 
   function cartaoHtml(r) {
     const status = r.statusCliente || r.status || '—';
@@ -374,7 +379,14 @@
   // Chamada pelo #5 (agent_intent.js) quando a análise da conversa reconhece
   // uma intenção com confiança suficiente. Só aparece se o painel ainda não
   // tiver nenhum resultado (não sobrescreve uma consulta manual em andamento).
-  function mostrarDeteccao({ intencao, confianca, identificadores }) {
+  //
+  // `sugestao`, quando vem preenchida, é uma resposta que não depende de
+  // dado do paciente (ex.: orientação de preparo) — chegou pronta do
+  // servidor, sem precisar de código/CPF/nome nem consulta ao apLIS. Nesse
+  // caso não há "Consultar": a informação já é o próprio reconhecimento da
+  // intenção, e a sugestão entra no mesmo estágio usado por renderCartao/
+  // renderPaciente (achar -> sugerir).
+  function mostrarDeteccao({ intencao, confianca, identificadores, sugestao }) {
     // Uma detecção nova pode atualizar outra detecção (a conversa evoluiu),
     // mas nunca pisa numa busca manual que o atendente já iniciou.
     if (origemConteudoAtual === 'manual') return;
@@ -386,21 +398,30 @@
         <i class="ph-bold ph-sparkle"></i>
         <div>
           <strong>Intenção detectada:</strong> ${escapeHtml(LABEL_PROCESSO[intencao] || intencao)} (${percentual}%)
-          ${termoBusca
-            ? `<div class="agent-acoes"><button type="button" class="agent-btn-secundario" id="agent-consultar-deteccao"><i class="ph-bold ph-magnifying-glass"></i> Consultar</button></div>`
-            : `<div class="agent-estado-detalhe">Não encontrei CPF ou código na conversa. Peça o documento ou digite manualmente abaixo.</div>`}
+          ${sugestao
+            ? ''
+            : termoBusca
+              ? `<div class="agent-acoes"><button type="button" class="agent-btn-secundario" id="agent-consultar-deteccao"><i class="ph-bold ph-magnifying-glass"></i> Consultar</button></div>`
+              : `<div class="agent-estado-detalhe">Não encontrei CPF ou código na conversa. Peça o documento ou digite manualmente abaixo.</div>`}
         </div>
       </div>`;
 
-    const btnConsultar = document.getElementById('agent-consultar-deteccao');
-    if (btnConsultar) {
-      btnConsultar.addEventListener('click', () => consultar(termoBusca, { somenteIntencao: intencao }));
+    if (!sugestao) {
+      const btnConsultar = document.getElementById('agent-consultar-deteccao');
+      if (btnConsultar) {
+        btnConsultar.addEventListener('click', () => consultar(termoBusca, { somenteIntencao: intencao }));
+      }
     }
     origemConteudoAtual = 'deteccao';
 
+    if (sugestao) {
+      revelarSugestoesEmEstagio([{ processoId: intencao, intencao, texto: sugestao.texto, baseadoEm: sugestao.baseadoEm || null }]);
+    }
+
     // Minimizado, a detecção só atualiza o conteúdo por baixo — não força o
-    // painel a reabrir sozinho, e uma intenção sem sugestão pronta ainda não
-    // conta como "não vista" no contador.
+    // painel a reabrir sozinho. Zera o contador aqui sempre: sem sugestao,
+    // não há nada "não visto" ainda; com sugestao, o próprio estágio (acima)
+    // vai recontar quando ela realmente entrar na tela.
     if (minimizado) {
       definirContagemNaoVistas(0);
     } else {

@@ -57,13 +57,25 @@ O cache é indexado por `chatId` + id da última mensagem, no navegador. Reabrir
 
 ### Intenção como lista fechada, com campo de descoberta
 
-Texto livre de intenção não é acionável: cada dia inventa um rótulo diferente e nada consegue escolher template ou medir. A saída usa JSON Schema com enum de quatro valores — três atendidos mais `outro`.
+Texto livre de intenção não é acionável: cada dia inventa um rótulo diferente e nada consegue escolher template ou medir. A saída usa JSON Schema com enum fechado — hoje cinco valores (quatro atendidos mais `outro`; nasceu com três atendidos, `orientacao_preparo` entrou depois, ver decisão abaixo).
 
-O `outro` carrega texto livre descritivo e vai para log estruturado no servidor, sem `chatId`, CPF ou nome. Ao fim do piloto, o ranking dos `outro` é a lista priorizada do que mapear em seguida — que é exatamente a dúvida em aberto sobre quais processos o atendimento executa.
+O `outro` carrega texto livre descritivo e vai para log estruturado no servidor, sem `chatId`, CPF ou nome. Ao fim do piloto, o ranking dos `outro` é a lista priorizada do que mapear em seguida — que é exatamente a dúvida em aberto sobre quais processos o atendimento executa. Confiança alta em `outro` não é exibida no painel como "intenção detectada" (isso já foi um bug real: o campo de descoberta virando um rótulo sem sentido na tela do atendente) — vira silêncio, igual à confiança baixa.
+
+### Orientação de preparo: 4ª intenção, fora do motor de processos
+
+Testado ao vivo: um paciente perguntou "quais são as indicações do que eu devo fazer antes de um exame de sangue" e o painel não sugeriu nada. Causa: a lista fechada de intenções não tinha essa categoria — caía em `outro`, sem processo mapeado. Mas a Resposta Rápida `PREPARO` (`public/quick_responses.js`) já cobre exatamente isso.
+
+A diferença que importa: os três processos do MVP são todos sobre a situação de UMA requisição específica (`buscar: {tipo: 'consultarPaciente'}`, via `lib/processos/motor.js`, que por desenho exige identificador antes de rodar — ver "Ciclo de vida único com escotilha por etapa"). Preparo de exame não é sobre nenhuma requisição: a instrução é a mesma para qualquer paciente. Forçar isso pelo motor exigiria inventar uma consulta ao apLIS que não faz sentido, só para satisfazer um contrato pensado para outra coisa.
+
+Solução: `orientacao_preparo` é uma 4ª intenção reconhecida pelo classificador, mas resolvida por um caminho paralelo e mais simples — `lib/agent/respostas_faq.js`, um dicionário `intencao -> resposta`, consultado direto em `POST /api/agent/analisar` (nunca em `/api/aplis/consultar`, nunca via `calcularSugestoes`/`CATALOGO_PROCESSOS`). Duas decisões dentro dela:
+- **Nunca passa pelo redator (LLM).** Instruções de preparo (jejum, coleta de amostra) são quase-clínicas — reparafraseá-las arrisca alterar um detalhe que importa (duração do jejum, por exemplo). O texto sai literal da Resposta Rápida `PREPARO`, nunca gerado.
+- **Não pede identificador.** O painel, ao detectar essa intenção, não mostra "Consultar" nem pede CPF — a sugestão já chega pronta na resposta de `/api/agent/analisar` e entra direto no estágio de revelação (`revelarSugestoesEmEstagio`), igual à sugestão que vem depois de um cartão de paciente.
+
+Fica como padrão para o próximo item do ranking de `outro` que também não depender de dado do paciente (horário de funcionamento, endereço — já existem como Respostas Rápidas prontas): mesmo dicionário, sem tocar no motor de processos.
 
 ### Gemini 3.5 Flash-Lite com limiar de confiança
 
-A tarefa é classificação com enum de quatro valores mais extração de campos, não redação. No volume estimado (~255 chamadas/dia com o cache), o custo fica em torno de US$ 7/mês, contra ~US$ 31 do Flash.
+A tarefa é classificação com enum de valores fechado mais extração de campos, não redação. No volume estimado (~255 chamadas/dia com o cache), o custo fica em torno de US$ 7/mês, contra ~US$ 31 do Flash.
 
 O modelo mais barato erra mais, e o modo de falha importa: intenção errada exibida com confiança faz o atendente parar de olhar para o painel, e o projeto morre por desuso. Por isso o limiar de confiança é parte do desenho, não refinamento — abaixo dele o painel diz que não identificou. Errar em silêncio é recuperável. O piloto mede a taxa real e a troca de modelo é uma variável de configuração.
 

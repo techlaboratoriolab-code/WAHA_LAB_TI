@@ -56,7 +56,7 @@
       });
       const data = await res.json().catch(() => ({}));
       const resultado = res.ok && data.intencao
-        ? { intencao: data.intencao, confianca: data.confianca, identificadores: data.identificadores || {} }
+        ? { intencao: data.intencao, confianca: data.confianca, identificadores: data.identificadores || {}, sugestao: data.sugestao || null }
         : null;
 
       cachePorChat.set(chatId, { chave, resultado, mensagens: ultimas30 });

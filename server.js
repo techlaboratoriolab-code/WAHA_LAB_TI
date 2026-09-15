@@ -327,6 +327,7 @@ app.post('/api/aplis/consultar', async (req, res) => {
 // -----------------------------------------------------------------------------
 const { criarClassificadorIntencao } = require('./lib/agent/gemini');
 const { criarRedator } = require('./lib/agent/redator');
+const { obterRespostaFaq } = require('./lib/agent/respostas_faq');
 const { criarLimitadorDiario } = require('./lib/agent/limitador');
 const { extrairIdentificadoresDeTexto } = require('./lib/processos/identificadores');
 
@@ -377,11 +378,22 @@ app.post('/api/agent/analisar', async (req, res) => {
       return res.json({ intencao: null, confianca: classificacao.confianca, motivo: 'baixa_confianca', identificadores });
     }
 
+    if (classificacao.intencao === 'outro') {
+      // Confiança alta, mas nenhum processo mapeado para esta intenção — nada
+      // acionável para o painel mostrar (evita exibir "Intenção detectada: outro").
+      return res.json({ intencao: null, confianca: classificacao.confianca, motivo: 'sem_processo_mapeado', identificadores });
+    }
+
+    // Intenções que não dependem de dado do paciente (ex.: orientação de
+    // preparo) já chegam com a resposta pronta aqui — nunca passam pelo
+    // motor de processos nem exigem que o atendente ache o paciente antes.
+    const sugestao = obterRespostaFaq(classificacao.intencao);
+
     return res.json({
       intencao: classificacao.intencao,
       confianca: classificacao.confianca,
       identificadores,
-      resumoLivre: classificacao.intencao === 'outro' ? classificacao.resumoLivre : null
+      sugestao
     });
   } catch (err) {
     console.error('[agent] erro na classificação de intenção:', err && err.message);
