@@ -180,11 +180,69 @@
     });
   }
 
+  const ATRASO_ESTAGIO_SUGESTAO_MS = 420;
+
+  // A informação (cartão) já está na tela quando isto é chamado. A sugestão
+  // só entra depois de um instante, num segundo estágio visualmente
+  // distinto — para ler como "achou o dado -> preparou uma resposta", igual
+  // ao passo a passo do Claude, em vez de tudo despejado de uma vez.
+  function revelarSugestoesEmEstagio(sugestoesFiltradas) {
+    if (!sugestoesFiltradas.length) {
+      if (minimizado) definirContagemNaoVistas(0);
+      return;
+    }
+    const estagio = document.createElement('div');
+    estagio.className = 'agent-estagio-sugestao';
+    estagio.innerHTML = '<i class="ph-bold ph-sparkle"></i> Preparando resposta sugerida' +
+      '<span class="agent-dots"><span></span><span></span><span></span></span>';
+    body.appendChild(estagio);
+
+    const minhaGeracao = geracao;
+    setTimeout(() => {
+      if (minhaGeracao !== geracao || !estagio.isConnected) return;
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = sugestoesHtml(sugestoesFiltradas);
+      estagio.replaceWith(...wrapper.childNodes);
+      ligarBotoesInserir(body, sugestoesFiltradas);
+      if (minimizado) definirContagemNaoVistas(sugestoesFiltradas.length);
+    }, ATRASO_ESTAGIO_SUGESTAO_MS);
+  }
+
   function renderCartao(r, opts = {}) {
     const sugestoesFiltradas = filtrarSugestoes(r.sugestoes || [], opts.somenteIntencao);
-    body.innerHTML = cartaoHtml(r) + sugestoesHtml(sugestoesFiltradas);
-    ligarBotoesInserir(body, sugestoesFiltradas);
-    if (minimizado) definirContagemNaoVistas(sugestoesFiltradas.length);
+    body.innerHTML = cartaoHtml(r);
+    revelarSugestoesEmEstagio(sugestoesFiltradas);
+  }
+
+  // Recolhida por padrão: é contexto de apoio, não o que o atendente pediu
+  // agora — não deve competir por espaço com o cartão e a sugestão.
+  function outrasRequisicoesHtml(outras) {
+    if (!outras.length) return '';
+    return `
+      <button type="button" class="agent-lista-toggle" id="agent-outras-toggle">
+        <i class="ph-bold ph-caret-right"></i> Outras requisições deste paciente (${outras.length})
+      </button>
+      <ul class="agent-lista hidden" id="agent-outras-lista">
+        ${outras.map(({ r, i }) => `
+          <li><button type="button" class="agent-lista-item" data-indice="${i}">
+            <span class="agent-lista-principal">${escapeHtml(r.exame || 'Exame')}</span>
+            <span class="agent-lista-secundario">${escapeHtml(r.dtaSolicitacao || '')} · ${escapeHtml(SITUACAO_LABEL[r.situacao] || '')}</span>
+          </button></li>`).join('')}
+      </ul>`;
+  }
+
+  function ligarOutrasRequisicoes(paciente, opts) {
+    const toggle = document.getElementById('agent-outras-toggle');
+    const lista = document.getElementById('agent-outras-lista');
+    if (toggle && lista) {
+      toggle.addEventListener('click', () => {
+        lista.classList.toggle('hidden');
+        toggle.classList.toggle('aberto');
+      });
+    }
+    body.querySelectorAll('.agent-lista-item').forEach((el) => {
+      el.addEventListener('click', () => renderPaciente(paciente, Number(el.dataset.indice), opts));
+    });
   }
 
   // Um único paciente: cartão da requisição em foco + as demais dele, navegáveis sem nova chamada.
@@ -194,20 +252,9 @@
       .map((r, i) => ({ r, i }))
       .filter(({ i }) => i !== indiceEmFoco);
     const sugestoesFiltradas = filtrarSugestoes(emFoco.sugestoes || [], opts.somenteIntencao);
-    body.innerHTML = cartaoHtml(emFoco) + sugestoesHtml(sugestoesFiltradas) + (outras.length ? `
-      <div class="agent-lista-titulo">Outras requisições deste paciente</div>
-      <ul class="agent-lista">
-        ${outras.map(({ r, i }) => `
-          <li><button type="button" class="agent-lista-item" data-indice="${i}">
-            <span class="agent-lista-principal">${escapeHtml(r.exame || 'Exame')}</span>
-            <span class="agent-lista-secundario">${escapeHtml(r.dtaSolicitacao || '')} · ${escapeHtml(SITUACAO_LABEL[r.situacao] || '')}</span>
-          </button></li>`).join('')}
-      </ul>` : '');
-    ligarBotoesInserir(body, sugestoesFiltradas);
-    body.querySelectorAll('.agent-lista-item').forEach((el) => {
-      el.addEventListener('click', () => renderPaciente(paciente, Number(el.dataset.indice), opts));
-    });
-    if (minimizado) definirContagemNaoVistas(sugestoesFiltradas.length);
+    body.innerHTML = cartaoHtml(emFoco) + outrasRequisicoesHtml(outras);
+    ligarOutrasRequisicoes(paciente, opts);
+    revelarSugestoesEmEstagio(sugestoesFiltradas);
   }
 
   // Vários pacientes: lista de escolha. Nenhum cartão, nenhuma sugestão, até o atendente escolher.
