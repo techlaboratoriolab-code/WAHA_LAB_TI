@@ -1166,12 +1166,24 @@ body {
    seção dentro de .input-box-container), no espírito da barra "Peça ao
    Gemini" do teclado: cantos bem arredondados, alça no topo, sombra de
    elevação própria, separado visualmente da caixa de texto abaixo.
+
+   --agent-glow-color é a cor do anel animado — azul por padrão (sugestão
+   neutra). Fica pronta para os níveis de severidade (crítico/atenção)
+   só trocarem essa variável numa classe de estado, sem duplicar CSS.
 --------------------------------------------------------------------- */
+@property --agent-glow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
 .chat-input-area {
   position: relative;
 }
 
 .agent-panel {
+  --agent-glow-color: var(--blue-500);
+  --agent-glow-angle: 0deg;
   position: absolute;
   left: var(--s-6);
   right: var(--s-6);
@@ -1187,7 +1199,31 @@ body {
   box-shadow: var(--shadow-xl), 0 16px 40px -12px rgba(0, 0, 0, 0.45);
   animation: agent-panel-float-in 180ms var(--ease-out);
   z-index: 30;
-  overflow: hidden;
+}
+
+/* Anel de cor "rondando" o painel: um conic-gradient girando atrás dele,
+   levemente maior e borrado, só visível saindo pelas bordas — o próprio
+   fundo do painel cobre o miolo. */
+.agent-panel::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 30px;
+  background: conic-gradient(
+    from var(--agent-glow-angle),
+    var(--agent-glow-color) 0deg,
+    transparent 70deg,
+    transparent 290deg,
+    var(--agent-glow-color) 360deg
+  );
+  filter: blur(5px);
+  opacity: 0.75;
+  z-index: -1;
+  animation: agent-panel-glow-rotate 5s linear infinite;
+}
+
+@keyframes agent-panel-glow-rotate {
+  to { --agent-glow-angle: 360deg; }
 }
 
 @keyframes agent-panel-float-in {
@@ -1224,7 +1260,13 @@ body {
   letter-spacing: 0.04em;
 }
 
-.agent-panel-close {
+.agent-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.agent-panel-iconbtn {
   background: transparent;
   border: none;
   color: var(--text-muted-custom);
@@ -1237,9 +1279,76 @@ body {
   transition: all var(--dur-fast);
 }
 
-.agent-panel-close:hover {
+.agent-panel-iconbtn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-main);
+}
+
+/* ---------------------------------------------------------------------
+   BOLHA MINIMIZADA — o painel encolhido a um círculo com contador.
+--------------------------------------------------------------------- */
+.agent-bubble {
+  --agent-glow-color: var(--blue-500);
+  --agent-glow-angle: 0deg;
+  position: absolute;
+  right: var(--s-6);
+  bottom: calc(100% + 12px);
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--bg-card-item);
+  border: 1px solid var(--border-app-strong);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue-500);
+  font-size: 1.15rem;
+  cursor: pointer;
+  z-index: 30;
+  animation: agent-panel-float-in 180ms var(--ease-out);
+}
+
+.agent-bubble::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--agent-glow-angle),
+    var(--agent-glow-color) 0deg,
+    transparent 70deg,
+    transparent 290deg,
+    var(--agent-glow-color) 360deg
+  );
+  filter: blur(4px);
+  opacity: 0.75;
+  z-index: -1;
+  animation: agent-panel-glow-rotate 5s linear infinite;
+}
+
+.agent-bubble-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  background: var(--agent-glow-color, var(--blue-500));
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-blue-glow);
+  animation: agent-bubble-badge-pulse 1.8s var(--ease-smooth) infinite;
+}
+
+@keyframes agent-bubble-badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
 }
 
 .agent-consulta {
@@ -1292,6 +1401,8 @@ body {
 }
 
 .agent-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   margin-top: 8px;
 }

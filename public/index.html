@@ -185,9 +185,14 @@
             <div class="agent-panel-grabber"></div>
             <div class="agent-panel-header">
               <span class="agent-panel-title"><i class="ph-bold ph-robot"></i> Agente</span>
-              <button type="button" class="agent-panel-close" id="agent-panel-close" title="Fechar painel">
-                <i class="ph-bold ph-x"></i>
-              </button>
+              <div class="agent-panel-header-actions">
+                <button type="button" class="agent-panel-iconbtn" id="agent-panel-minimize" title="Minimizar">
+                  <i class="ph-bold ph-minus"></i>
+                </button>
+                <button type="button" class="agent-panel-iconbtn" id="agent-panel-close" title="Fechar painel">
+                  <i class="ph-bold ph-x"></i>
+                </button>
+              </div>
             </div>
             <form class="agent-consulta" id="agent-consulta-form" autocomplete="off">
               <input type="text" id="agent-consulta-input" class="agent-consulta-input"
@@ -198,6 +203,13 @@
             </form>
             <div class="agent-panel-body" id="agent-panel-body"></div>
           </div>
+
+          <!-- BOLHA MINIMIZADA — aparece quando o painel é encolhido; o contador só
+               reflete sugestões da situação atual, nunca de um contexto já superado. -->
+          <button type="button" class="agent-bubble hidden" id="agent-bubble" title="Abrir o agente">
+            <i class="ph-bold ph-robot"></i>
+            <span class="agent-bubble-badge hidden" id="agent-bubble-badge">0</span>
+          </button>
 
           <div class="input-box-container">
             <!-- PAINEL DE AUTOCOMPLETE DE ATALHOS / SLASH -->

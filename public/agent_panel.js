@@ -4,7 +4,7 @@
   const SITUACAO_LABEL = { em_andamento: 'Em andamento', concluido: 'Concluído', cancelado: 'Cancelado', desconhecido: '—' };
   const JANELA_PADRAO_DIAS = 90;
 
-  let panel, body, form, input, btn, toggleBtn;
+  let panel, body, form, input, btn, toggleBtn, minimizeBtn, bubble, bubbleBadge;
   // Cada consulta carrega a geração em que nasceu; reset() avança a geração e
   // qualquer resposta de geração antiga é descartada — nada de um chat cai no outro.
   let geracao = 0;
@@ -19,20 +19,64 @@
   // Id do chat aberto, só para buscar o contexto de conversa já analisado por
   // agent_intent.js (não guardamos as mensagens aqui, evita duplicar estado).
   let chatIdAtual = null;
+  // Painel encolhido a uma bolinha; o conteúdo continua sendo atualizado por
+  // baixo, só não é mostrado até o atendente reabrir.
+  let minimizado = false;
+  // Quantas sugestões da renderização MAIS RECENTE ainda não foram vistas —
+  // nunca uma soma histórica: cada render substitui esse número pelo que vale
+  // agora, então uma sugestão de um contexto já superado nunca fica contada.
+  let sugestoesNaoVistas = 0;
 
   function escapeHtml(str) {
     return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function definirContagemNaoVistas(n) {
+    sugestoesNaoVistas = n;
+    if (!bubbleBadge) return;
+    if (n > 0) {
+      bubbleBadge.textContent = n > 9 ? '9+' : String(n);
+      bubbleBadge.classList.remove('hidden');
+    } else {
+      bubbleBadge.classList.add('hidden');
+    }
+  }
+
+  function mostrarBolha() {
+    if (bubble) bubble.classList.remove('hidden');
+  }
+
+  function esconderBolha() {
+    if (bubble) bubble.classList.add('hidden');
+  }
+
+  // Reabre o painel cheio — seja vindo de minimizado, seja do botão de
+  // alternar na barra de ferramentas. Reabrir sempre marca como "visto".
   function abrir() {
+    minimizado = false;
+    esconderBolha();
+    definirContagemNaoVistas(0);
     panel.classList.remove('hidden');
     toggleBtn.classList.add('active');
     input.focus();
   }
 
+  // Dispensa por completo: some o painel E a bolinha, nada fica pendente.
   function fechar() {
+    minimizado = false;
     panel.classList.add('hidden');
     toggleBtn.classList.remove('active');
+    esconderBolha();
+    definirContagemNaoVistas(0);
+  }
+
+  // Encolhe para a bolinha — o conteúdo permanece no DOM, só escondido; o
+  // contador é quem os próximos renders forem calculando, nunca somado aqui.
+  function minimizar() {
+    minimizado = true;
+    panel.classList.add('hidden');
+    toggleBtn.classList.remove('active');
+    mostrarBolha();
   }
 
   // Ao trocar de conversa, nada do painel pode sobreviver: evita vazar dado de um chat para outro.
@@ -53,6 +97,7 @@
   // ---------------------------------------------------------------------------
   function renderCarregando(texto) {
     body.innerHTML = `<div class="agent-estado"><i class="ph-bold ph-spinner spinner"></i> ${escapeHtml(texto)}</div>`;
+    if (minimizado) definirContagemNaoVistas(0);
   }
 
   function renderErro(mensagem, detalhe) {
@@ -61,6 +106,7 @@
         <i class="ph-bold ph-warning-circle"></i>
         <div><strong>${escapeHtml(mensagem)}</strong>${detalhe ? `<div class="agent-estado-detalhe">${escapeHtml(detalhe)}</div>` : ''}</div>
       </div>`;
+    if (minimizado) definirContagemNaoVistas(0);
   }
 
   function renderNaoEncontrado({ tipo, termo, janelaDias }) {
@@ -77,6 +123,7 @@
       </div>`;
     const ampliarBtn = document.getElementById('agent-ampliar-btn');
     if (ampliarBtn) ampliarBtn.addEventListener('click', () => consultar(termo, { ampliar: true }));
+    if (minimizado) definirContagemNaoVistas(0);
   }
 
   const LABEL_PROCESSO = { previsao_entrega: 'Previsão de entrega', status_exame: 'Status do exame', laudo_disponivel: 'Laudo / portal' };
@@ -137,6 +184,7 @@
     const sugestoesFiltradas = filtrarSugestoes(r.sugestoes || [], opts.somenteIntencao);
     body.innerHTML = cartaoHtml(r) + sugestoesHtml(sugestoesFiltradas);
     ligarBotoesInserir(body, sugestoesFiltradas);
+    if (minimizado) definirContagemNaoVistas(sugestoesFiltradas.length);
   }
 
   // Um único paciente: cartão da requisição em foco + as demais dele, navegáveis sem nova chamada.
@@ -159,6 +207,7 @@
     body.querySelectorAll('.agent-lista-item').forEach((el) => {
       el.addEventListener('click', () => renderPaciente(paciente, Number(el.dataset.indice), opts));
     });
+    if (minimizado) definirContagemNaoVistas(sugestoesFiltradas.length);
   }
 
   // Vários pacientes: lista de escolha. Nenhum cartão, nenhuma sugestão, até o atendente escolher.
@@ -181,6 +230,7 @@
     body.querySelectorAll('.agent-lista-item').forEach((el) => {
       el.addEventListener('click', () => escolherPaciente(Number(el.dataset.indice)));
     });
+    if (minimizado) definirContagemNaoVistas(0);
   }
 
   // Ao escolher, busca o status da requisição mais recente pelo código (aprofunda só o escolhido).
@@ -300,7 +350,15 @@
       btnConsultar.addEventListener('click', () => consultar(termoBusca, { somenteIntencao: intencao }));
     }
     origemConteudoAtual = 'deteccao';
-    abrir();
+
+    // Minimizado, a detecção só atualiza o conteúdo por baixo — não força o
+    // painel a reabrir sozinho, e uma intenção sem sugestão pronta ainda não
+    // conta como "não vista" no contador.
+    if (minimizado) {
+      definirContagemNaoVistas(0);
+    } else {
+      abrir();
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -310,12 +368,17 @@
     input = document.getElementById('agent-consulta-input');
     btn = document.getElementById('agent-consulta-btn');
     toggleBtn = document.getElementById('agent-toggle-btn');
-    if (!panel || !body || !form || !input || !btn || !toggleBtn) return;
+    minimizeBtn = document.getElementById('agent-panel-minimize');
+    bubble = document.getElementById('agent-bubble');
+    bubbleBadge = document.getElementById('agent-bubble-badge');
+    if (!panel || !body || !form || !input || !btn || !toggleBtn || !minimizeBtn || !bubble || !bubbleBadge) return;
 
     toggleBtn.addEventListener('click', () => {
       if (panel.classList.contains('hidden')) abrir(); else fechar();
     });
     document.getElementById('agent-panel-close').addEventListener('click', fechar);
+    minimizeBtn.addEventListener('click', minimizar);
+    bubble.addEventListener('click', abrir);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       consultar(input.value);
