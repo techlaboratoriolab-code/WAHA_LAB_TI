@@ -1201,24 +1201,29 @@ body {
   z-index: 30;
 }
 
-/* Anel de cor "rondando" o painel: um conic-gradient girando atrás dele,
-   levemente maior e borrado, só visível saindo pelas bordas — o próprio
-   fundo do painel cobre o miolo. */
+/* Feixe de cor percorrendo só o contorno do painel: o conic-gradient existe
+   na caixa inteira, mas a máscara (padding-box menos border-box) apaga tudo
+   exceto uma faixa de 2px bem na borda — sem blur, sem halo vazando para
+   fora ou para dentro (o efeito de "sonar" das versões anteriores vinha
+   exatamente desse vazamento borrado). */
 .agent-panel::before {
   content: '';
   position: absolute;
-  inset: -3px;
-  border-radius: 30px;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  border: 2px solid transparent;
   background: conic-gradient(
     from var(--agent-glow-angle),
     var(--agent-glow-color) 0deg,
     transparent 70deg,
     transparent 290deg,
     var(--agent-glow-color) 360deg
-  );
-  filter: blur(5px);
-  opacity: 0.75;
-  z-index: -1;
+  ) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0) border-box;
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
   animation: agent-panel-glow-rotate 5s linear infinite;
 }
 
@@ -1312,18 +1317,21 @@ body {
 .agent-bubble::before {
   content: '';
   position: absolute;
-  inset: -3px;
-  border-radius: 50%;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  border: 2px solid transparent;
   background: conic-gradient(
     from var(--agent-glow-angle),
     var(--agent-glow-color) 0deg,
     transparent 70deg,
     transparent 290deg,
     var(--agent-glow-color) 360deg
-  );
-  filter: blur(4px);
-  opacity: 0.75;
-  z-index: -1;
+  ) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0) border-box;
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
   animation: agent-panel-glow-rotate 5s linear infinite;
 }
 
