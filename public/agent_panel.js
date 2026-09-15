@@ -130,7 +130,8 @@
     previsao_entrega: 'Previsão de entrega',
     status_exame: 'Status do exame',
     laudo_disponivel: 'Laudo / portal',
-    orientacao_preparo: 'Preparo para o exame'
+    orientacao_preparo: 'Preparo para o exame',
+    situacao_pagamento: 'Cortesia / convênio'
   };
 
   function cartaoHtml(r) {

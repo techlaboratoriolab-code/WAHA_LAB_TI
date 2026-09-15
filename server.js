@@ -93,6 +93,23 @@ app.use('/api/aplis', requireAtendente);
 const { criarAplisClient, AplisError } = require('./lib/aplis/client');
 const { consultarPorCodigo, buscarPorPaciente, classificarTermo } = require('./lib/aplis/consultas');
 const { calcularSugestoes } = require('./lib/processos/sugestoes');
+const { criarMirrorClient } = require('./lib/db/mirrorClient');
+const { interpretarFontePagadora } = require('./lib/db/convenio');
+
+// Banco espelho do apLIS — só para o fato que nenhum comando de leitura
+// barato da API expõe (convênio/cortesia; ver design.md). Ausente por padrão:
+// sem as variáveis DB_*, `situacaoPagamento` fica sempre null e o quarto
+// processo (situacao_pagamento) nunca produz sugestão — igual a qualquer
+// outro cliente opcional deste arquivo (aplisClient, redator, ...).
+const mirrorClient = (process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME)
+  ? criarMirrorClient({
+      host: process.env.DB_HOST.trim(),
+      port: Number(process.env.DB_PORT) || 3306,
+      user: process.env.DB_USER.trim(),
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME.trim()
+    })
+  : null;
 
 // Encontrada uma única "situação" (por código, ou por paciente já
 // desambiguado), anexa nela mesma quais respostas prontas ela sustenta —
@@ -104,6 +121,19 @@ const { calcularSugestoes } = require('./lib/processos/sugestoes');
 async function anexarSugestoes(resultado, mensagens) {
   const situacao = resultado.requisicao || (resultado.pacientes && resultado.pacientes.length === 1 ? resultado.pacientes[0].requisicoes[0] : null);
   if (!situacao) return resultado;
+
+  if (mirrorClient) {
+    try {
+      const fontePagadora = await mirrorClient.buscarFontePagadora(situacao.codRequisicao);
+      situacao.situacaoPagamento = interpretarFontePagadora(fontePagadora);
+    } catch (e) {
+      // Espelho fora do ar, requisição recente demais para já estar
+      // espelhada, ou qualquer outra falha: degrada sem sugestão de
+      // pagamento, os outros três processos continuam de pé.
+      situacao.situacaoPagamento = null;
+    }
+  }
+
   situacao.sugestoes = await calcularSugestoes(situacao, { redator, mensagens });
   return resultado;
 }

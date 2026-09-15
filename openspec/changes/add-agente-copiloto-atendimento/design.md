@@ -37,6 +37,8 @@ Havia a opção de consultar um banco espelho do apLIS com atraso de 1 dia, aces
 
 O espelho perde nos três eixos: introduz janela de 1 dia em que o sistema responde "não encontrei" para quem coletou ontem — justamente a intenção mais frequente —, expõe a base de pacientes fora da rede com superusuário, e ainda assim exige a API depois para status e laudo. **Decisão: usar apenas a API.** O banco volta à discussão se aparecer consulta agregada que a API não cubra, aí com usuário restrito a `SELECT`.
 
+**Atualização:** essa condição apareceu — ver "Cortesia/convênio: banco espelho, não a API" abaixo. A decisão de usar só a API continua valendo para tudo que a API já cobre; o espelho volta só para o que ela não cobre, e só com esse escopo.
+
 ### Lista branca de comandos, em vez de política de não escrever
 
 "Não escrever no apLIS" como regra escrita depende de todo mundo lembrar. O `aplisClient` aceita apenas seis comandos de leitura e rejeita qualquer outro antes de montar a requisição. `admissaoSalvar` e `requisicaoCancelar` não são proibidos — são inconstruíveis. Isso também protege contra injeção via mensagem de paciente, já que o texto do paciente nunca vira nome de comando.
@@ -72,6 +74,25 @@ Solução: `orientacao_preparo` é uma 4ª intenção reconhecida pelo classific
 - **Não pede identificador.** O painel, ao detectar essa intenção, não mostra "Consultar" nem pede CPF — a sugestão já chega pronta na resposta de `/api/agent/analisar` e entra direto no estágio de revelação (`revelarSugestoesEmEstagio`), igual à sugestão que vem depois de um cartão de paciente.
 
 Fica como padrão para o próximo item do ranking de `outro` que também não depender de dado do paciente (horário de funcionamento, endereço — já existem como Respostas Rápidas prontas): mesmo dicionário, sem tocar no motor de processos.
+
+### Cortesia/convênio: banco espelho, não a API
+
+Testado ao vivo: "Meus exames foram feitos como cortesia, certo?" também não gerava sugestão — mesmo padrão do preparo de exame, mas com uma diferença importante: essa pergunta É sobre uma requisição específica do paciente (identificador continua obrigatório), então não cabia no caminho do `orientacao_preparo`.
+
+Investigação, nesta ordem, antes de escrever qualquer código:
+1. `requisicaoListar`/`requisicaoStatus` (os dois que o sistema já usa): confirmado ao vivo, com uma requisição real, que nenhum dos dois devolve convênio/fonte pagadora.
+2. `requisicaoResultado` (permitido no `aplisClient`, nunca usado): a documentação (`Docs/APLIS_API_Documentation.pdf`) confirma que ele traz `paciente.convenio` — mas embutido junto do laudo clínico completo (diagnósticos, laudo micro/macro, patologista, lâminas...). Buscar isso só para saber "foi cortesia?" significa trazer e processar dado clínico sensível muito além do necessário, e só funciona depois do laudo pronto.
+3. `faturamentoLoteListar` (também permitido): devolve lotes agregados de faturamento — `FontePagadora` por lote, não por requisição — e cruza dados de muitos pacientes/convênios diferentes num só retorno. Não serve para uma pergunta individual sem vazar informação de outros pacientes.
+4. A documentação da API revelou o conceito: `instituicaoSalvar.segmento` classifica formalmente uma instituição como `10 – Cortesia` (também `7 – Particular`, `11 – Convênio`). "Cortesia" é uma propriedade da fonte pagadora/convênio vinculada à requisição, não um campo direto nela.
+5. Nenhum comando de leitura da API expõe essa classificação de forma barata e isolada. Essa é exatamente a condição que a decisão original (acima) previa para reabrir a discussão do banco espelho.
+
+Exploração do espelho (somente leitura, sem escrever nada): `requisicao.IdFontePagadora` e `requisicao.IdConvenio` apontam para `fatinstituicao.IdInstituicao`/`fatconvenio.IdConvenio`. Testado contra a mesma requisição real: `fatinstituicao.NomFantasia` veio literalmente `"Cortesia"` — confirmando o dado. O campo `Segmento` desse mesmo registro veio `0`, não `10` como a documentação da API descreve para `instituicaoSalvar` — por isso a implementação (`lib/db/convenio.js`) decide pelo **nome** ("CORTESIA"/"PARTICULAR", comparação sem acento/caixa), não pelo `Segmento`, que se mostrou não confiável neste banco.
+
+**Decisão:** `lib/db/mirrorClient.js` é um cliente MySQL só para esta consulta — uma função nomeada, parametrizada por código de requisição exato (nunca por CPF/nome: a desambiguação de paciente já aconteceu na camada do apLIS antes disto rodar), mesma disciplina de lista branca do `aplisClient` (nenhuma query livre, nenhuma escrita). O resultado é anexado à `situacao` em `server.js`, antes de `calcularSugestoes`, e um 4º processo (`situacao_pagamento`, em `catalogo.js`) o transforma em sugestão — **sem passar pelo redator**: é uma confirmação factual (cortesia/particular/convênio), e reparafraseá-la arrisca inverter o sentido, mesmo raciocínio do `orientacao_preparo`.
+
+**Risco aceito e não resolvido:** a credencial do espelho em uso hoje é a mesma de superusuário (root) que já existia no `.env` antes da decisão original de API-only — nunca foi trocada por um usuário restrito a `SELECT`, como a decisão original já previa como mitigação. O contrato "só leitura" é garantido pela disciplina do código (`mirrorClient.js` só expõe uma função, um SELECT fixo), não pelo banco. Ver tasks.md 1.7.
+
+**Limitação aceita:** o espelho tem atraso de ~1 dia. Uma requisição admitida hoje pode não aparecer ainda — `situacao_pagamento` degrada para "sem sugestão" nesse caso (nunca erro, nunca resposta errada), igual a qualquer outra falha do espelho.
 
 ### Gemini 3.5 Flash-Lite com limiar de confiança
 

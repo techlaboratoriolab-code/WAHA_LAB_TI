@@ -19,6 +19,13 @@ const AGENT_TEMPLATES = {
   laudo_disponivel: {
     texto: 'Sobre o laudo do seu exame de {{exame}}: {{statusCliente}} Você pode acompanhar e acessar pelo portal, com o login e a senha já enviados: https://lab.aplis.inf.br/index.php',
     slotsObrigatorios: ['exame', 'statusCliente']
+  },
+  // Nunca passa pelo redator (ver lib/processos/catalogo.js): é uma
+  // confirmação factual de cortesia/convênio/particular, e reparafrasear
+  // isso arrisca inverter o sentido ("foi" vs "não foi").
+  situacao_pagamento: {
+    texto: 'Confirmando: seu exame de {{exame}} foi realizado como {{situacaoPagamento}}.',
+    slotsObrigatorios: ['exame', 'situacaoPagamento']
   }
 };
 

@@ -1,11 +1,12 @@
 ## 1. Pré-requisitos operacionais
 
 - [ ] 1.1 Rotacionar as credenciais do apLIS e confirmar acesso com a credencial nova
-- [ ] 1.2 Desativar o acesso externo ao banco espelho, já desnecessário pela decisão de usar a API
+- [x] ~~1.2 Desativar o acesso externo ao banco espelho, já desnecessário pela decisão de usar a API~~ — revertido (ver 1.7): o acesso continua necessário, agora para uma finalidade nova e restrita
 - [ ] 1.3 Solicitar à Lacuna credencial de integração somente leitura para o apLIS
 - [ ] 1.4 Confirmar que a conta Gemini está em tier pago e obter a chave de API
 - [ ] 1.5 Definir o horário de expediente e registrar em arquivo de configuração
-- [ ] 1.6 Adicionar `APLIS_BASE_URL`, `APLIS_USUARIO`, `APLIS_SENHA`, `GEMINI_API_KEY`, `AGENT_ENABLED`, `AGENT_ATENDENTES`, `AGENT_TETO_DIARIO` ao `.env.example`
+- [x] 1.6 Adicionar `APLIS_BASE_URL`, `APLIS_USUARIO`, `APLIS_SENHA`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `AGENT_CONFIANCA_MINIMA`, `AGENT_TETO_DIARIO` e `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (ver 1.7) ao `.env.example`. `AGENT_ENABLED`/`AGENT_ATENDENTES` ainda pendentes (ver 8.5)
+- [ ] 1.7 Pedir à TI do laboratório um usuário MySQL do banco espelho com `GRANT SELECT` restrito a `requisicao`, `fatinstituicao`, `fatconvenio` — hoje a integração usa a credencial de superusuário (root) que já existia no `.env` antes da decisão de API-only. Risco aceito e documentado em design.md até isso ser trocado
 
 ## 2. Autenticação das rotas
 
@@ -54,11 +55,12 @@
 - [x] 6.8 Rodar as três chamadas ao redator em paralelo (`Promise.all` em `calcularSugestoes`), não em série
 - [x] 6.9 Threading do contexto de conversa ponta a ponta: `agent_intent.js` guarda as últimas mensagens por chat, `agent_panel.js` as reaproveita em toda consulta (detectada ou manual) via `chatIdAtual`
 - [x] 6.10 4ª capacidade — `orientacao_preparo` (achado ao vivo: pergunta real de paciente sobre preparo para exame de sangue não gerava sugestão): `lib/agent/respostas_faq.js`, caminho paralelo ao motor de processos para intenções sem dado de paciente, citando a Resposta Rápida `PREPARO` literalmente (nunca pelo redator — são instruções quase-clínicas). Também corrigido: `outro` com confiança alta não deve mais aparecer como "Intenção detectada: outro" no painel
+- [x] 6.11 5ª capacidade — `situacao_pagamento` (achado ao vivo: "meus exames foram feitos como cortesia, certo?" também não gerava sugestão). Confirmado que nenhum comando de leitura barato da API expõe convênio/cortesia por exame — só o banco espelho (`lib/db/mirrorClient.js`, `requisicao.IdFontePagadora → fatinstituicao.NomFantasia`, ver design.md "Cortesia/convênio: banco espelho, não a API"). Novo processo declarativo (não passa pelo redator — é confirmação factual) em `catalogo.js`, dado anexado à `situacao` em `server.js` antes de `calcularSugestoes`. Corrigido de passagem: `lib/processos/sugestoes.js` nunca passava `AGENT_TEMPLATES` de verdade a `executarProcesso` (ficava `{}`) — inofensivo enquanto todo processo declarativo usava a escotilha de função, virou bug real com o primeiro processo puramente declarativo
 
 ## 7. Detecção de intenção
 
 - [x] 7.1 Adicionar `@google/genai` e configurar o cliente Gemini no servidor
-- [x] 7.2 Definir o JSON Schema de saída com enum de intenções (hoje cinco, ver 6.10), identificadores e confiança
+- [x] 7.2 Definir o JSON Schema de saída com enum de intenções (hoje seis, ver 6.10 e 6.11), identificadores e confiança
 - [x] 7.3 Criar `POST /api/agent/analisar`, recebendo as últimas 30 mensagens e devolvendo a classificação
 - [x] 7.4 Implementar o limiar de confiança, exibindo indefinição abaixo dele
 - [x] 7.5 Implementar reconhecimento por expressão regular de requisição de 13 dígitos, CPF e credencial `P#####`

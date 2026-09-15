@@ -2,8 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { sanitizarClassificacao, montarConteudoDaConversa, INTENCOES } = require('../../lib/agent/gemini');
 
-test('INTENCOES é a lista fechada de cinco valores', () => {
-  assert.deepEqual(INTENCOES, ['previsao_entrega', 'laudo_disponivel', 'status_exame', 'orientacao_preparo', 'outro']);
+test('INTENCOES é a lista fechada de seis valores', () => {
+  assert.deepEqual(INTENCOES, ['previsao_entrega', 'laudo_disponivel', 'status_exame', 'orientacao_preparo', 'situacao_pagamento', 'outro']);
 });
 
 test('sanitizarClassificacao aceita uma resposta bem formada', () => {
