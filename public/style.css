@@ -1162,26 +1162,55 @@ body {
 }
 
 /* ---------------------------------------------------------------------
-   PAINEL DO AGENTE (acima do campo de digitação)
+   PAINEL DO AGENTE — flutua sobre o campo de digitação (não é mais uma
+   seção dentro de .input-box-container), no espírito da barra "Peça ao
+   Gemini" do teclado: cantos bem arredondados, alça no topo, sombra de
+   elevação própria, separado visualmente da caixa de texto abaixo.
 --------------------------------------------------------------------- */
+.chat-input-area {
+  position: relative;
+}
+
 .agent-panel {
+  position: absolute;
+  left: var(--s-6);
+  right: var(--s-6);
+  bottom: 100%;
+  margin-bottom: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  max-height: min(70vh, 460px);
   background: var(--bg-card-item);
   border: 1px solid var(--border-app-strong);
-  border-radius: var(--r-xl);
-  padding: 10px 12px;
-  margin-bottom: 6px;
-  animation: slide-up 150ms var(--ease-out);
-  position: relative;
-  z-index: 5;
+  border-radius: 28px;
+  padding: 8px var(--s-4) var(--s-4);
+  box-shadow: var(--shadow-xl), 0 16px 40px -12px rgba(0, 0, 0, 0.45);
+  animation: agent-panel-float-in 180ms var(--ease-out);
+  z-index: 30;
+  overflow: hidden;
+}
+
+@keyframes agent-panel-float-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.agent-panel-grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--border-app-strong);
+  opacity: 0.7;
+  margin: 6px auto 10px;
+  flex-shrink: 0;
 }
 
 .agent-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+  margin-bottom: 4px;
 }
 
 .agent-panel-title {
@@ -1195,9 +1224,28 @@ body {
   letter-spacing: 0.04em;
 }
 
+.agent-panel-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted-custom);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast);
+}
+
+.agent-panel-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
 .agent-consulta {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .agent-consulta-input {
@@ -1243,8 +1291,14 @@ body {
   cursor: wait;
 }
 
+.agent-panel-body {
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
 .agent-panel-body:empty {
   display: none;
+  margin-top: 0;
 }
 
 .agent-estado {

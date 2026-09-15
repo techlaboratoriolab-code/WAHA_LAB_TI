@@ -179,6 +179,26 @@
 
         <!-- CAIXA DE ENTRADA E ENVIO DE MENSAGEM -->
         <footer class="chat-input-area">
+          <!-- PAINEL DO AGENTE (CONSULTA AO APLIS) — flutua sobre o campo de digitação,
+               fora do input-box-container, para não parecer "mais uma seção" da caixa. -->
+          <div class="agent-panel hidden" id="agent-panel">
+            <div class="agent-panel-grabber"></div>
+            <div class="agent-panel-header">
+              <span class="agent-panel-title"><i class="ph-bold ph-robot"></i> Agente</span>
+              <button type="button" class="agent-panel-close" id="agent-panel-close" title="Fechar painel">
+                <i class="ph-bold ph-x"></i>
+              </button>
+            </div>
+            <form class="agent-consulta" id="agent-consulta-form" autocomplete="off">
+              <input type="text" id="agent-consulta-input" class="agent-consulta-input"
+                placeholder="Código da requisição, CPF ou nome do paciente" maxlength="80">
+              <button type="submit" class="agent-consulta-btn" id="agent-consulta-btn">
+                <i class="ph-bold ph-magnifying-glass"></i> Consultar
+              </button>
+            </form>
+            <div class="agent-panel-body" id="agent-panel-body"></div>
+          </div>
+
           <div class="input-box-container">
             <!-- PAINEL DE AUTOCOMPLETE DE ATALHOS / SLASH -->
             <div class="slash-autocomplete-popover hidden" id="slash-autocomplete-popover">
@@ -203,24 +223,6 @@
               <button class="reply-preview-close" id="cancel-reply-btn" title="Cancelar resposta">
                 <i class="ph-bold ph-x"></i>
               </button>
-            </div>
-
-            <!-- PAINEL DO AGENTE (CONSULTA AO APLIS) -->
-            <div class="agent-panel hidden" id="agent-panel">
-              <div class="agent-panel-header">
-                <span class="agent-panel-title"><i class="ph-bold ph-robot"></i> Agente</span>
-                <button type="button" class="reply-preview-close" id="agent-panel-close" title="Fechar painel">
-                  <i class="ph-bold ph-x"></i>
-                </button>
-              </div>
-              <form class="agent-consulta" id="agent-consulta-form" autocomplete="off">
-                <input type="text" id="agent-consulta-input" class="agent-consulta-input"
-                  placeholder="Código da requisição, CPF ou nome do paciente" maxlength="80">
-                <button type="submit" class="agent-consulta-btn" id="agent-consulta-btn">
-                  <i class="ph-bold ph-magnifying-glass"></i> Consultar
-                </button>
-              </form>
-              <div class="agent-panel-body" id="agent-panel-body"></div>
             </div>
 
             <div class="message-input-wrapper">
