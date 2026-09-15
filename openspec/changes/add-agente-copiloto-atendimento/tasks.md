@@ -6,7 +6,7 @@
 - [ ] 1.4 Confirmar que a conta Gemini está em tier pago e obter a chave de API
 - [ ] 1.5 Definir o horário de expediente e registrar em arquivo de configuração
 - [x] 1.6 Adicionar `APLIS_BASE_URL`, `APLIS_USUARIO`, `APLIS_SENHA`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `AGENT_CONFIANCA_MINIMA`, `AGENT_TETO_DIARIO` e `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (ver 1.7) ao `.env.example`. `AGENT_ENABLED`/`AGENT_ATENDENTES` ainda pendentes (ver 8.5)
-- [ ] 1.7 Pedir à TI do laboratório um usuário MySQL do banco espelho com `GRANT SELECT` restrito a `requisicao`, `fatinstituicao`, `fatconvenio` — hoje a integração usa a credencial de superusuário (root) que já existia no `.env` antes da decisão de API-only. Risco aceito e documentado em design.md até isso ser trocado
+- [x] 1.7 Usuário MySQL restrito (`agente_atendimento_ro`) provisionado com `GRANT SELECT` só em `requisicao`, `fatinstituicao`, `fatconvenio` — substitui o root que estava no `.env`. Verificado ao vivo: lê as três tabelas, recusa `SELECT` em qualquer outra (testado com `paciente`) e recusa `UPDATE`. Achado no processo: o handshake de conectar já dentro de um banco (`database` nas opções do pool) é recusado para um usuário sem privilégio de banco, mesmo com `SELECT` concedido por tabela — `lib/db/mirrorClient.js` teve que parar de selecionar banco padrão e qualificar cada tabela (`lab.requisicao`, etc.) nas queries
 
 ## 2. Autenticação das rotas
 
