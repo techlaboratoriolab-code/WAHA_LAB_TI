@@ -31,16 +31,34 @@ test('a renderização dos três processos é função, não declaração', () =
   }
 });
 
-test('cada processo referencia uma entrada válida em REFERENCIAS_RESPOSTA_RAPIDA', async () => {
+test('cada processo oferece ao redator o pool inteiro de referências, todas válidas em REFERENCIAS_RESPOSTA_RAPIDA', async () => {
+  const textosValidos = Object.values(REFERENCIAS_RESPOSTA_RAPIDA).map((r) => r.texto);
   for (const p of CATALOGO_PROCESSOS) {
     const r = await executarProcesso(p, { identificadores: { cpf: '1' } }, ferramentasFake({ encontrado: true, multiplos: false, situacao: SITUACAO_COMPLETA }), {}, {
-      redigir: async ({ referencia }) => {
-        assert.ok(Object.values(REFERENCIAS_RESPOSTA_RAPIDA).some((r) => r.texto === referencia), `${p.id} usa uma referência fora do catálogo`);
+      redigir: async ({ referencias }) => {
+        assert.ok(Array.isArray(referencias) && referencias.length > 1, `${p.id} deveria oferecer várias referências, não uma fixa`);
+        for (const ref of referencias) {
+          assert.ok(textosValidos.includes(ref.texto), `${p.id} ofereceu uma referência fora do catálogo`);
+        }
         return { texto: 'ok' };
       }
     });
     assert.equal(r.resultado, 'sugestao');
   }
+});
+
+test('os três processos recebem exatamente o mesmo pool de referências — a escolha é do redator, pelo contexto, não travada por processo', async () => {
+  const poolsOferecidos = [];
+  for (const p of CATALOGO_PROCESSOS) {
+    await executarProcesso(p, { identificadores: { cpf: '1' } }, ferramentasFake({ encontrado: true, multiplos: false, situacao: SITUACAO_COMPLETA }), {}, {
+      redigir: async ({ referencias }) => {
+        poolsOferecidos.push(referencias.map((r) => r.id).sort());
+        return { texto: 'ok' };
+      }
+    });
+  }
+  assert.deepEqual(poolsOferecidos[0], poolsOferecidos[1]);
+  assert.deepEqual(poolsOferecidos[1], poolsOferecidos[2]);
 });
 
 test('com redator disponível, o texto final vem do redator, não do template fixo', async () => {

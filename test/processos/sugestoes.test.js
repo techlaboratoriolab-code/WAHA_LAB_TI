@@ -34,8 +34,8 @@ test('cada sugestão traz a intenção que a originou', async () => {
 test('com redator, o texto vem dele e a conversa chega até a chamada', async () => {
   const chamadas = [];
   const redator = {
-    redigir: async ({ situacao, referencia, mensagens }) => {
-      chamadas.push({ situacao, referencia, mensagens });
+    redigir: async ({ situacao, referencias, mensagens }) => {
+      chamadas.push({ situacao, referencias, mensagens });
       return { texto: 'Mensagem do redator para ' + situacao.exame };
     }
   };
@@ -46,13 +46,19 @@ test('com redator, o texto vem dele e a conversa chega até a chamada', async ()
   assert.ok(sugestoes.every((s) => s.texto.startsWith('Mensagem do redator para')));
   assert.equal(chamadas.length, 3);
   assert.deepEqual(chamadas[0].mensagens, mensagens);
-  assert.equal(typeof chamadas[0].referencia, 'string');
+  assert.ok(Array.isArray(chamadas[0].referencias) && chamadas[0].referencias.length > 1);
 });
 
-test('cada sugestão carrega de qual referência de Resposta Rápida ela partiu', async () => {
+test('cada sugestão carrega de qual referência de Resposta Rápida ela partiu, conforme o próprio redator relatou', async () => {
+  const redator = { redigir: async () => ({ texto: 'x', baseadoEmId: 'biologiamolecular' }) };
+  const sugestoes = await calcularSugestoes(SITUACAO_COMPLETA, { redator });
+  assert.ok(sugestoes.every((s) => s.baseadoEm === 'biologiamolecular'));
+});
+
+test('sem o redator relatar baseadoEmId, a sugestão fica sem referência (nunca inventa uma)', async () => {
   const redator = { redigir: async () => ({ texto: 'x' }) };
   const sugestoes = await calcularSugestoes(SITUACAO_COMPLETA, { redator });
-  assert.ok(sugestoes.every((s) => typeof s.baseadoEm === 'string' && s.baseadoEm.length > 0));
+  assert.ok(sugestoes.every((s) => s.baseadoEm === null));
 });
 
 test('redator que falha (devolve null) ainda produz sugestão pelo template fixo', async () => {

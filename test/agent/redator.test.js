@@ -31,3 +31,17 @@ test('sanitizarRedacao rejeita texto vazio, só espaço, ausente ou entrada inv�
   assert.equal(sanitizarRedacao(null), null);
   assert.equal(sanitizarRedacao('texto solto'), null);
 });
+
+test('sanitizarRedacao mantém baseadoEmId quando é um id dentre as referências oferecidas', () => {
+  const referencias = [{ id: 'site', texto: 'a' }, { id: 'prot', texto: 'b' }];
+  assert.deepEqual(sanitizarRedacao({ texto: 'x', baseadoEmId: 'site' }, referencias), { texto: 'x', baseadoEmId: 'site' });
+});
+
+test('sanitizarRedacao descarta baseadoEmId que não estava entre as referências oferecidas (alucinação do modelo)', () => {
+  const referencias = [{ id: 'site', texto: 'a' }];
+  assert.deepEqual(sanitizarRedacao({ texto: 'x', baseadoEmId: 'nao_existe' }, referencias), { texto: 'x' });
+});
+
+test('sanitizarRedacao sem lista de referências nunca aceita baseadoEmId, mesmo que pareça válido', () => {
+  assert.deepEqual(sanitizarRedacao({ texto: 'x', baseadoEmId: 'site' }), { texto: 'x' });
+});

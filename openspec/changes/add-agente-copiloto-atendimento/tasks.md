@@ -50,7 +50,7 @@
 - [x] 6.4 Declarar o processo `status_exame` (busca declarativa; ver 6.7 sobre a renderização)
 - [x] ~~6.5 Confirmar que nenhum dos três usa a escotilha de função~~ — superado por decisão posterior (ver 6.7): a busca continua declarativa nos três; a renderização passou a usar a escotilha de propósito
 - [x] 6.6 Omitir o template quando faltar dado para alguma lacuna e registrar a lacuna não preenchida
-- [x] 6.7 Basear a sugestão nas Respostas Rápidas existentes: `lib/agent/redator.js` (Gemini, ancorado em fatos do apLIS + referência de estilo + contexto da conversa) e `lib/processos/referencias_respostas_rapidas.js`; a etapa de renderizar dos três processos vira função, com o template fixo original como fallback determinístico se o redator faltar ou falhar
+- [x] 6.7 Basear a sugestão nas Respostas Rápidas existentes: `lib/agent/redator.js` (Gemini, ancorado em fatos do apLIS + pool de referências de estilo + contexto da conversa) e `lib/processos/referencias_respostas_rapidas.js`; a etapa de renderizar dos três processos vira função, com o template fixo original como fallback determinístico se o redator faltar ou falhar. Seleção da referência é dinâmica pelo contexto (não fixa por processo): os três processos oferecem o mesmo pool e o redator escolhe/relata via `baseadoEmId`, validado contra a lista oferecida antes de ser aceito
 - [x] 6.8 Rodar as três chamadas ao redator em paralelo (`Promise.all` em `calcularSugestoes`), não em série
 - [x] 6.9 Threading do contexto de conversa ponta a ponta: `agent_intent.js` guarda as últimas mensagens por chat, `agent_panel.js` as reaproveita em toda consulta (detectada ou manual) via `chatIdAtual`
 
